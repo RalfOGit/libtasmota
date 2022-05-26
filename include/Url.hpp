@@ -1,0 +1,41 @@
+#ifndef __LIBTASMOTA_URL_HPP__
+#define __LIBTASMOTA_URL_HPP__
+
+#include <string>
+
+namespace libtasmota {
+
+    /**
+     *  Class implementing url parsing.
+     */
+    class Url {
+    public:
+
+        Url(void);
+        Url(const std::string& url);
+
+        std::string getUrl(void);
+        std::string getProtocol(void);
+        std::string getHost(void);
+        int         getPort(void);
+        std::string getPath(void);
+        std::string getQuery(void);
+        std::string getFragment(void);
+
+        static int parseUrl(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& path, std::string& query, std::string& fragment);
+
+        static std::string replaceSpecialCharacters(const std::string& url_component, const std::string::value_type url_component_identifier);
+
+    private:
+        std::string url;
+        std::string protocol;
+        std::string host;
+        int         port;
+        std::string path;
+        std::string query;
+        std::string fragment;
+    };
+
+}   // namespace libgoecharger
+
+#endif

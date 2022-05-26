@@ -1,0 +1,7 @@
+build/
+out/
+doc/
+.vs/
+.vscode/
+*.tar
+CMakeSettings.json
