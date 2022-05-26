@@ -175,9 +175,14 @@ namespace libtasmota {
             }
         };
 
-        /// Type definition for a 
+        /// Type definition for a vector of json named value pairs
         typedef std::vector<JsonNamedValue> JsonNamedValueVector;
 
+        /**
+        * Get a vector of json named value pairs from the given json tree level.
+        * @param json  pointer to a subtree in the json tree
+        * @return a vector of json named value pairs, or an empty vector
+        */
         static JsonNamedValueVector getNamedValues(const json_value* const json) {
             JsonNamedValueVector named_variants;
             if (json != NULL && json->type == json_object) {
@@ -194,11 +199,21 @@ namespace libtasmota {
         }
 
         typedef bool (*compare)(const std::string& lhs, const std::string& rhs);
+
+        /**
+        * Get a vector of json named value pair from the given json tree level.
+        * @param elements  pointer to an array of json object entries
+        * @param num_elements number of array elements
+        * @param name the name of the json named value pair to search for
+        * @param name_comparator a function pointer to an optional name comparater method, or NULL
+        * @return a json named value pair, or an empty named value pair
+        */
         static JsonNamedValue getValue(const json_object_entry* const elements, const size_t num_elements, const std::string& name, compare name_comparator) {
             if (elements != NULL) {
                 for (size_t i = 0; i < num_elements; ++i) {
                     std::string element_name(elements[i].name, elements[i].name_length);
-                    if (name_comparator(element_name, name) == true) {
+                    if (name_comparator == NULL && element_name == name ||
+                        name_comparator != NULL && name_comparator(element_name, name) == true) {
                         return JsonNamedValue(&elements[i]);
                     }
                 }
