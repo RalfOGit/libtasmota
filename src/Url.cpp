@@ -192,9 +192,9 @@ int Url::parseUrl(const std::string& url, std::string& protocol, std::string& ho
     }
 
     // replace special characters in the path, query and fragment with their %hex url encoding; e.g. ' ' is replace by %20
-    path     = replaceSpecialCharacters(path,     '/');
-    query    = replaceSpecialCharacters(query,    '?');
-    fragment = replaceSpecialCharacters(fragment, '#');
+    path     = percentEncode(path,     '/');
+    query    = percentEncode(query,    '?');
+    fragment = percentEncode(fragment, '#');
 
     return 0;
 }
@@ -205,7 +205,7 @@ int Url::parseUrl(const std::string& url, std::string& protocol, std::string& ho
  * @param url_component_identifier input - the first character in the url component, i.e. '/', '?' or '#'
  * @return the input string, where all special characters are replaced
  */
-std::string Url::replaceSpecialCharacters(const std::string& url_component, const std::string::value_type url_component_identifier) {
+std::string Url::percentEncode(const std::string& url_component, const std::string::value_type url_component_identifier) {
     std::string result;
     size_t offs = 0;
 
@@ -232,12 +232,13 @@ std::string Url::replaceSpecialCharacters(const std::string& url_component, cons
         bool extra      = (c == ':' || c == '@');
         bool extra_qf   = (c == '/' || c == '?');
 
-        // copy an allowed character to the result string
+        // copy any allowed character to the result string
         if (unreserved || subdelims || extra || (url_component_identifier == '?' || url_component_identifier == '#') && extra_qf) {
             result.append(1, c);
+            continue;
         }
         // copy any pct-encoded character (i.e. "%" HEXDIG HEXDIG) to the result string
-        else if (c == '%' && (i+2) < url_component.length()) {
+        if (c == '%' && (i+2) < url_component.length()) {
             std::string::value_type h1 = url_component[i + 1];
             std::string::value_type h2 = url_component[i + 2];
             if ((h1 >= 'a' && h1 <= 'f' || h1 >= 'A' && h1 <= 'F' || h1 >= '0' && h1 <= '9') &&
@@ -246,15 +247,14 @@ std::string Url::replaceSpecialCharacters(const std::string& url_component, cons
                 result.append(1, h1);
                 result.append(1, h2);
                 i = i + 2;
+                continue;
             }
         }
         // pct-encode any other character and append it to the result string
-        else {
-            char buffer[16];
-            snprintf(buffer, sizeof(buffer), "%02x", c);
-            result.append(1, '%');
-            result.append(buffer);
-        }
+        char buffer[16];
+        snprintf(buffer, sizeof(buffer), "%02X", c);
+        result.append(1, '%');
+        result.append(buffer);
     }
     return result;
 }

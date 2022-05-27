@@ -24,7 +24,7 @@ namespace libtasmota {
 
         static int parseUrl(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& path, std::string& query, std::string& fragment);
 
-        static std::string replaceSpecialCharacters(const std::string& url_component, const std::string::value_type url_component_identifier);
+        static std::string percentEncode(const std::string& url_component, const std::string::value_type url_component_identifier);
 
     private:
         std::string url;
