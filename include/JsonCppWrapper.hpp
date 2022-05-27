@@ -1,6 +1,34 @@
 #ifndef __LIBTASMOTA_JSONCPPWRAPPER_HPP__
 #define __LIBTASMOTA_JSONCPPWRAPPER_HPP__
 
+/*
+ * Copyright(C) 2022 RalfO. All rights reserved.
+ * https://github.com/RalfOGit/libtasmota
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 #include <Json.hpp>
 #include <cstdint>
 #include <string>
@@ -125,7 +153,10 @@ namespace libtasmota {
             }
         };
 
-        /** Class encapsulating a json name value pair. It supports all possible json value types. */
+        /**
+        * Class encapsulating a json name value pair.
+        * It holds instances of all possible json value types; only one of them is valid at any given time.
+        */
         class JsonNamedValue {
         protected:
             std::string name;
@@ -137,31 +168,34 @@ namespace libtasmota {
             JsonDouble  value_double;
             json_type   type;
         public:
-            JsonNamedValue(const json_object_entry* const entry = NULL) {
+            JsonNamedValue(const json_object_entry* const entry = NULL) :
+                value_object (entry),
+                value_array  (entry),
+                value_string (entry),
+                value_boolean(entry),
+                value_int    (entry),
+                value_double (entry) {
                 if (entry != NULL && entry->name != NULL && entry->value != NULL) {
                     name = std::string(entry->name, entry->name_length);
-                    switch (entry->value->type) {
-                    case json_object:   value_object  = JsonObject(entry); type = json_object;  break;
-                    case json_string:   value_string  = JsonString(entry); type = json_string;  break;
-                    case json_boolean:  value_boolean = JsonBool(entry);   type = json_boolean; break;
-                    case json_integer:  value_int     = JsonInt(entry);    type = json_integer; break;
-                    case json_double:   value_double  = JsonDouble(entry); type = json_double;  break;
-                    case json_array:    value_array   = JsonArray(entry);  type = json_array;   break;
-                    }
+                    type = entry->value->type;
                 }
                 else {
                     name = "INVALID";
                     type = json_none;
                 }
             }
-            const std::string& getName  (void) const { return name; }
-            const JsonObject&  getObject(void) const { return value_object; }
-            const JsonArray&   getArray (void) const { return value_array; }
-            const JsonString&  getString(void) const { return value_string; }
-            const JsonBool&    getBool  (void) const { return value_boolean; }
-            const JsonInt&     getInt   (void) const { return value_int; }
-            const JsonDouble&  getDouble(void) const { return value_double; }
-            const json_type    getType  (void) const { return type; }
+            const std::string& getName  (void) const { return name; }           ///< Get name of this json name value pair.
+            const JsonObject&  getObject(void) const { return value_object; }   ///< Get object value of this json name value pair.
+            const JsonArray&   getArray (void) const { return value_array; }    ///< Get array value of this json name value pair.
+            const JsonString&  getString(void) const { return value_string; }   ///< Get string value of this json name value pair.
+            const JsonBool&    getBool  (void) const { return value_boolean; }  ///< Get boolean value of this json name value pair.
+            const JsonInt&     getInt   (void) const { return value_int; }      ///< Get integer value of this json name value pair.
+            const JsonDouble&  getDouble(void) const { return value_double; }   ///< Get double value of this json name value pair.
+            const json_type    getType  (void) const { return type; }           ///< Get type of this json name value pair.
+            /**
+            * Get the value of this json name value pair converted to a string.
+            * @return the value as string
+            */
             std::string getValueAsString(void) const {
                 switch (type) {
                 case json_object:  return value_object .getValueAsString();

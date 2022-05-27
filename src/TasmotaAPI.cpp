@@ -1,8 +1,3 @@
-#include <TasmotaAPI.hpp>
-#include <HttpClient.hpp>
-#include <JsonCppWrapper.hpp>
-#include <locale>
-
 /*
  * Copyright(C) 2022 RalfO. All rights reserved.
  * https://github.com/RalfOGit/libtasmota
@@ -31,8 +26,17 @@
  * SUCH DAMAGE.
  */
 
+#include <TasmotaAPI.hpp>
+#include <HttpClient.hpp>
+#include <JsonCppWrapper.hpp>
+#include <locale>
+
 using namespace libtasmota;
 
+
+/**
+ * Constructor.
+ */
 TasmotaAPI::TasmotaAPI(const std::string& url) :
     host_url(url)
 {
@@ -41,11 +45,11 @@ TasmotaAPI::TasmotaAPI(const std::string& url) :
     }
 }
 
-TasmotaAPI::~TasmotaAPI(void) {
-}
 
-
-// get a vector of modules supported by the firmware
+/**
+ * Get a vector of modules supported by the firmware.
+ * @return a map of module id and module name pairs
+ */
 std::map<std::string, std::string> TasmotaAPI::getModules(void) {
 
     // get json response from device
@@ -55,8 +59,8 @@ std::map<std::string, std::string> TasmotaAPI::getModules(void) {
         std::map<std::string, std::string> modules;
 
         // get Modules element and all sub-elements
-        const JsonCppWrapper::JsonNamedValueVector& roots = JsonCppWrapper::getNamedValues(json);
-        const JsonCppWrapper::JsonNamedValue&       root  = roots[0];
+        const JsonCppWrapper::JsonNamedValueVector roots = JsonCppWrapper::getNamedValues(json);
+        const JsonCppWrapper::JsonNamedValue&      root  = roots[0];
         if (compareNames(root.getName(), "Modules", true) && root.getType() == json_object) {
             const json_object_entry* elements = root.getObject().getElements();
             int64_t              num_elements = root.getObject().getNumElements();
@@ -71,26 +75,19 @@ std::map<std::string, std::string> TasmotaAPI::getModules(void) {
 }
 
 
-int TasmotaAPI::getPower(void) {
-    std::string value = getValue("Power");
-    if (value == "ON") {
-        return 1;
-    }
-    else if (value == "OFF") {
-        return 0;
-    }
-    return -1;
-}
-
-
+/**
+ * Get the value for the given key from the tasmota device; the value is converted to a string.
+ * @param key the name of the key value pair
+ * @return the value of the key value pair
+ */
 std::string TasmotaAPI::getValue(const std::string& key) {
 
     // get json response from device
     json_value* json = getJsonResponse(key);
     if (json != NULL) {
 
-        const JsonCppWrapper::JsonNamedValueVector& roots = JsonCppWrapper::getNamedValues(json);
-        const JsonCppWrapper::JsonNamedValue&       root  = roots[0];
+        const JsonCppWrapper::JsonNamedValueVector roots = JsonCppWrapper::getNamedValues(json);
+        const JsonCppWrapper::JsonNamedValue&      root  = roots[0];
         if (compareNames(root.getName(), key, false)) {
             if (root.getType() == json_object) {
                 const json_object_entry* elements = root.getObject().getElements();
@@ -120,6 +117,13 @@ std::string TasmotaAPI::getValue(const std::string& key) {
 }
 
 
+/**
+ * Get the value for the given key path from the tasmota device; the value is converted to a string.
+ * The key path is a string containing path segments, separated by ':' characters. The path is defining
+ * the traversal through the result of a "Status 0" command to the tasmota device.
+ * @param key the key path of the key value pair. e.g. "StatusSNS:ENERGY:Power" to get the power consumption
+ * @return the value of the key value pair
+ */
 std::string TasmotaAPI::getValueFromPath(const std::string& path) {
 
     // get json response from device
@@ -159,13 +163,75 @@ std::string TasmotaAPI::getValueFromPath(const std::string& path) {
 }
 
 
+std::string TasmotaAPI::setValue(const std::string& key, const std::string& value) {
+    // assemble host_url + command
+    std::string device_url(host_url);
+    device_url.append("cm?cmnd=");
+    device_url.append(key);
+    device_url.append(" ");
+    device_url.append(value);
+
+    // send http put request
+    HttpClient http_client;
+    std::string response;
+    std::string content;
+    int http_return_code = http_client.sendHttpPutRequest(device_url, response, content);
+
+    // check if the http return code is 200 OK
+    if (http_return_code == 200) {
+        // parse json response
+        json_value* json = json_parse(content.c_str(), content.length());
+        if (json != NULL) {
+
+            // analyze the json response
+            const JsonCppWrapper::JsonNamedValueVector roots = JsonCppWrapper::getNamedValues(json);
+            const JsonCppWrapper::JsonNamedValue& root = roots[0];
+            if (compareNames(root.getName(), key, false)) {
+                if (root.getType() == json_object) {
+                    const json_object_entry* elements = root.getObject().getElements();
+                    int64_t              num_elements = root.getObject().getNumElements();
+                    for (int i = 0; i < num_elements; ++i) {
+                        const json_object_entry& element = elements[i];
+                        const std::string name = std::string(element.name);
+                        switch (element.value->type) {
+                        case json_string:   return JsonCppWrapper::JsonString(&element).getValue();
+                        case json_double:   return JsonCppWrapper::JsonDouble(&element).getValueAsString();
+                        case json_integer:  return JsonCppWrapper::JsonInt(&element).getValueAsString();
+                        case json_boolean:  return JsonCppWrapper::JsonBool(&element).getValueAsString();
+                        case json_null:     return "null";
+                        }
+                    }
+                }
+                switch (root.getType()) {
+                case json_string:   return root.getString().getValue();
+                case json_double:   return root.getDouble().getValueAsString();
+                case json_integer:  return root.getInt().getValueAsString();
+                case json_boolean:  return root.getBool().getValueAsString();
+                case json_null:     return "null";
+                }
+            }
+        }
+        return content;
+    }
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "HTTP-Returncode: %d", http_return_code);
+    return std::string(buffer);
+}
+
+
+/**
+ * Get the json response for the given command om the tasmota device.
+ * An http get request is send to "http://'host_url'/cm?cmnd='command'.
+ * @param command the tasmota command string.
+ * @return the json response tree.
+ */
 json_value* TasmotaAPI::getJsonResponse(const std::string& command) {
     // assemble host_url + command
     std::string device_url(host_url);
     device_url.append("cm?cmnd=");
-    device_url.append(command);  // invalid characters in url are replaced by the URL class
+    device_url.append(command);
 
-    // send http status request
+    // send http get status request
     HttpClient http_client;
     std::string response;
     std::string content;
@@ -181,6 +247,13 @@ json_value* TasmotaAPI::getJsonResponse(const std::string& command) {
 }
 
 
+/**
+ * Compare tasmota key names.
+ * @param name1 the first name to compare
+ * @param name2 the second name to compare
+ * @param strict false: name extensions with digits are ignored; true: only differences in lower and upper case are ignored
+ * @return true, if the two names are considered to be equal; false, if the two names are considered to be different
+ */
 bool TasmotaAPI::compareNames(const std::string& name1, const std::string& name2, const bool strict) {
 
     // first check if both strings are identical
@@ -191,6 +264,8 @@ bool TasmotaAPI::compareNames(const std::string& name1, const std::string& name2
     // extract base names by removing any trailing digits
     std::string base_name1 = name1;
     std::string base_name2 = name2;
+
+    // if the comparison is not strict, consider "Module0" and "Module" as the same name
     if (strict == false) {
         while (base_name1.length() > 0) {
             char last_char = base_name1.at(base_name1.length() - 1);
@@ -230,6 +305,13 @@ bool TasmotaAPI::compareNames(const std::string& name1, const std::string& name2
 }
 
 
+/**
+ * Segment a given key path into a vector of path segments.
+ * The key path is a string containing path segments, separated by ':' characters. The path is defining
+ * the traversal through the result of a "Status 0" command to the tasmota device.
+ * @param key the key path of the key value pair. e.g. "StatusSNS:ENERGY:Power" to get the power consumption
+ * @return a vector containing path segments, e.g. "StatusSNS", "ENERGY", "Power"
+ */
 std::vector<std::string> TasmotaAPI::getPathSegments(const std::string& path) {
     std::vector<std::string> segments;
     std::string::size_type index = 0;

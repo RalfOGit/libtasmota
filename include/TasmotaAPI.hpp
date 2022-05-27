@@ -54,14 +54,13 @@ namespace libtasmota {
     public:
 
         TasmotaAPI(const std::string& host_url);
-        ~TasmotaAPI(void);
+        ~TasmotaAPI(void) {}
 
         // Get accessor methods.
         std::string getValue(const std::string& key);                               // e.g. "Module"
         std::string getValueFromPath(const std::string& path);                      // e.g. "StatusSNS:ENERGY:Voltage"
 
         std::map<std::string, std::string> getModules(void);                        // get a vector of modules supported by the firmware
-        int getPower(void);
 
         // Set accessor methods.
         std::string setValue(const std::string& key, const std::string& value);     // e.g. "Voltage", can be used if key is unique
