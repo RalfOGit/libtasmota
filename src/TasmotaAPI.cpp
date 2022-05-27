@@ -80,37 +80,16 @@ std::map<std::string, std::string> TasmotaAPI::getModules(void) {
  * @param key the name of the key value pair
  * @return the value of the key value pair
  */
-std::string TasmotaAPI::getValue(const std::string& key) {
+std::string TasmotaAPI::getValue(const std::string& name) {
 
     // get json response from device
-    json_value* json = getJsonResponse(key);
+    json_value* json = getJsonResponse(name);
     if (json != NULL) {
 
-        const JsonCppWrapper::JsonNamedValueVector roots = JsonCppWrapper::getNamedValues(json);
-        const JsonCppWrapper::JsonNamedValue&      root  = roots[0];
-        if (compareNames(root.getName(), key, false)) {
-            if (root.getType() == json_object) {
-                const json_object_entry* elements = root.getObject().getElements();
-                int64_t              num_elements = root.getObject().getNumElements();
-                for (int i = 0; i < num_elements; ++i) {
-                    const json_object_entry& element = elements[i];
-                    const std::string name = std::string(element.name);
-                    switch (element.value->type) {
-                    case json_string:   return JsonCppWrapper::JsonString(&element).getValue();
-                    case json_double:   return JsonCppWrapper::JsonDouble(&element).getValueAsString();
-                    case json_integer:  return JsonCppWrapper::JsonInt   (&element).getValueAsString();
-                    case json_boolean:  return JsonCppWrapper::JsonBool  (&element).getValueAsString();
-                    case json_null:     return "null";
-                    }
-                }
-            }
-            switch (root.getType()) {
-            case json_string:   return root.getString().getValue();
-            case json_double:   return root.getDouble().getValueAsString();
-            case json_integer:  return root.getInt().getValueAsString();
-            case json_boolean:  return root.getBool().getValueAsString();
-            case json_null:     return "null";
-            }
+        // search json for the given name
+        std::string value = getValueFromJson(json, name);
+        if (value.length() > 0) {
+            return value;
         }
     }
     return "INVALID";
@@ -163,11 +142,14 @@ std::string TasmotaAPI::getValueFromPath(const std::string& path) {
 }
 
 
-std::string TasmotaAPI::setValue(const std::string& key, const std::string& value) {
+/**
+ * Set the value in the tasmota device.
+ */
+std::string TasmotaAPI::setValue(const std::string& name, const std::string& value) {
     // assemble host_url + command
     std::string device_url(host_url);
     device_url.append("cm?cmnd=");
-    device_url.append(key);
+    device_url.append(name);
     device_url.append(" ");
     device_url.append(value);
 
@@ -179,36 +161,15 @@ std::string TasmotaAPI::setValue(const std::string& key, const std::string& valu
 
     // check if the http return code is 200 OK
     if (http_return_code == 200) {
+
         // parse json response
         json_value* json = json_parse(content.c_str(), content.length());
         if (json != NULL) {
 
-            // analyze the json response
-            const JsonCppWrapper::JsonNamedValueVector roots = JsonCppWrapper::getNamedValues(json);
-            const JsonCppWrapper::JsonNamedValue& root = roots[0];
-            if (compareNames(root.getName(), key, false)) {
-                if (root.getType() == json_object) {
-                    const json_object_entry* elements = root.getObject().getElements();
-                    int64_t              num_elements = root.getObject().getNumElements();
-                    for (int i = 0; i < num_elements; ++i) {
-                        const json_object_entry& element = elements[i];
-                        const std::string name = std::string(element.name);
-                        switch (element.value->type) {
-                        case json_string:   return JsonCppWrapper::JsonString(&element).getValue();
-                        case json_double:   return JsonCppWrapper::JsonDouble(&element).getValueAsString();
-                        case json_integer:  return JsonCppWrapper::JsonInt(&element).getValueAsString();
-                        case json_boolean:  return JsonCppWrapper::JsonBool(&element).getValueAsString();
-                        case json_null:     return "null";
-                        }
-                    }
-                }
-                switch (root.getType()) {
-                case json_string:   return root.getString().getValue();
-                case json_double:   return root.getDouble().getValueAsString();
-                case json_integer:  return root.getInt().getValueAsString();
-                case json_boolean:  return root.getBool().getValueAsString();
-                case json_null:     return "null";
-                }
+            // search json for the given name
+            std::string value = getValueFromJson(json, name);
+            if (value.length() > 0) {
+                return value;
             }
         }
         return content;
@@ -244,6 +205,47 @@ json_value* TasmotaAPI::getJsonResponse(const std::string& command) {
         return json;
     }
     return NULL;
+}
+
+
+/**
+ * Get the value for the given name from the given json tree.
+ * @param json the json tree
+ * @param name the name of the name value pair
+ * @return the value of the name value pair
+ */
+std::string TasmotaAPI::getValueFromJson(const json_value* const json, const std::string& name) {
+    if (json != NULL) {
+
+        // analyze the json response
+        const JsonCppWrapper::JsonNamedValueVector roots = JsonCppWrapper::getNamedValues(json);
+        const JsonCppWrapper::JsonNamedValue&      root  = roots[0];
+        if (compareNames(root.getName(), name, false)) {
+            if (root.getType() == json_object) {
+                const json_object_entry* elements = root.getObject().getElements();
+                int64_t              num_elements = root.getObject().getNumElements();
+                for (int i = 0; i < num_elements; ++i) {
+                    const json_object_entry& element = elements[i];
+                    const std::string        name    = std::string(element.name);
+                    switch (element.value->type) {
+                    case json_string:   return JsonCppWrapper::JsonString(&element).getValue();
+                    case json_double:   return JsonCppWrapper::JsonDouble(&element).getValueAsString();
+                    case json_integer:  return JsonCppWrapper::JsonInt   (&element).getValueAsString();
+                    case json_boolean:  return JsonCppWrapper::JsonBool  (&element).getValueAsString();
+                    case json_null:     return "null";
+                    }
+                }
+            }
+            switch (root.getType()) {
+            case json_string:   return root.getString().getValue();
+            case json_double:   return root.getDouble().getValueAsString();
+            case json_integer:  return root.getInt   ().getValueAsString();
+            case json_boolean:  return root.getBool  ().getValueAsString();
+            case json_null:     return "null";
+            }
+        }
+    }
+    return "";
 }
 
 
