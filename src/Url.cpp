@@ -59,6 +59,42 @@ Url::Url(const std::string& url_) :
 }
 
 /**
+ * Constructor providing parsing results of the given url - eg "http://192.168.178.19/status".
+ * @param protocol_ the url protocol, e.g. "http"
+ * @param host_ the host ip address, e.g. "192.168.1.2"
+ * @param path_ the path, e.g. "/some_path"
+ * @param query_ the optional query part of the url, e.g. "?some_query"
+ * @param fragment_ the optional fragment part of the url, e.g. "#some_fragment"
+ */
+Url::Url(const std::string& protocol_, const std::string& host_, const std::string& path_, const std::string& query_, const std::string& fragment_) :
+    protocol(protocol_),
+    host(host_),
+    path(path_),
+    query(query_),
+    fragment(fragment_)
+{
+    // percent encode critical characters in the path, query and fragment with their %hex url encoding; e.g. ' ' is replace by %20
+    path     = percentEncode(path, '/');
+    query    = percentEncode(query, '?');
+    fragment = percentEncode(fragment, '#');
+
+    url = protocol;
+    url.append("://");
+    url.append(host);
+    if (protocol == "http") {
+        url.append(":80");
+        port = 80;
+    }
+    else if (protocol == "https") {
+        url.append(":443");
+        port = 443;
+    }
+    url.append(path);
+    url.append(query);
+    url.append(fragment);
+}
+
+/**
  * Get url string.
  * @return the url
  */

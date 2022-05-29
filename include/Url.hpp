@@ -13,6 +13,7 @@ namespace libtasmota {
 
         Url(void);
         Url(const std::string& url);
+        Url(const std::string& protocol, const std::string& host, const std::string& path, const std::string& query, const std::string& fragment);
 
         std::string getUrl(void);
         std::string getProtocol(void);

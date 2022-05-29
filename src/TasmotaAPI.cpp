@@ -28,6 +28,7 @@
 
 #include <TasmotaAPI.hpp>
 #include <HttpClient.hpp>
+#include <Url.hpp>
 #include <JsonCppWrapper.hpp>
 #include <locale>
 
@@ -36,14 +37,11 @@ using namespace libtasmota;
 
 /**
  * Constructor.
+ * @param url the first part of the tasmota device url, e.g. "http://192.168.1.2"
  */
 TasmotaAPI::TasmotaAPI(const std::string& url) :
     host_url(url)
-{
-    if (host_url.length() > 0 && host_url[host_url.length() - 1] != '/') {
-        host_url.append("/");
-    }
-}
+{}
 
 
 /**
@@ -53,7 +51,8 @@ TasmotaAPI::TasmotaAPI(const std::string& url) :
 std::map<std::string, std::string> TasmotaAPI::getModules(void) {
 
     // get json response from device
-    json_value* json = getJsonResponse("Modules");
+    std::string http_status;
+    json_value* json = getJsonResponse("Modules", http_status);
     if (json != NULL) {
 
         std::map<std::string, std::string> modules;
@@ -83,7 +82,8 @@ std::map<std::string, std::string> TasmotaAPI::getModules(void) {
 std::string TasmotaAPI::getValue(const std::string& name) {
 
     // get json response from device
-    json_value* json = getJsonResponse(name);
+    std::string http_status;
+    json_value* json = getJsonResponse(name, http_status);
     if (json != NULL) {
 
         // search json for the given name
@@ -92,7 +92,7 @@ std::string TasmotaAPI::getValue(const std::string& name) {
             return value;
         }
     }
-    return "INVALID";
+    return http_status;
 }
 
 
@@ -106,7 +106,8 @@ std::string TasmotaAPI::getValue(const std::string& name) {
 std::string TasmotaAPI::getValueFromPath(const std::string& path) {
 
     // get json response from device
-    json_value* json = getJsonResponse("Status%200");
+    std::string http_status;
+    json_value* json = getJsonResponse("Status%200", http_status);
     if (json != NULL) {
 
         // split path into segments
@@ -138,7 +139,7 @@ std::string TasmotaAPI::getValueFromPath(const std::string& path) {
             return leaf.getValueAsString();
         }
     }
-    return "NOT_FOUND";
+    return http_status;
 }
 
 
@@ -146,12 +147,8 @@ std::string TasmotaAPI::getValueFromPath(const std::string& path) {
  * Set the value in the tasmota device.
  */
 std::string TasmotaAPI::setValue(const std::string& name, const std::string& value) {
-    // assemble host_url + command
-    std::string device_url(host_url);
-    device_url.append("cm?cmnd=");
-    device_url.append(name);
-    device_url.append(" ");
-    device_url.append(value);
+    // assemble the tasmota device url
+    std::string device_url = assembleHttpUrl(name, value);
 
     // send http put request
     HttpClient http_client;
@@ -175,8 +172,35 @@ std::string TasmotaAPI::setValue(const std::string& name, const std::string& val
         return content;
     }
     char buffer[64];
-    snprintf(buffer, sizeof(buffer), "HTTP-Returncode: %d", http_return_code);
-    return std::string(buffer);
+    snprintf(buffer, sizeof(buffer), "HTTP-Returncode: %d : ", http_return_code);
+    return std::string(buffer).append(content);
+}
+
+
+/**
+ * Assemble a tasmota device url.
+ * @param name the tasmota command name
+ * @param value the value if this is a set command; provide an empty string for get commands
+ * @return the device url, i.e. something like "http://192.168.1.2:80/cm?cmnd=Status%200"
+ */
+std::string TasmotaAPI::assembleHttpUrl(const std::string& command, const std::string& value) {
+    // parse the given host_url to separate protocol and host
+    std::string protocol, host, path, query, fragment; int port;
+    Url::parseUrl(host_url, protocol, host, port, path, query, fragment);
+
+    // overwrite path, query and fragment url components to reflect the given command
+    path  = "/cm";
+    query = "?cmnd=";
+    query.append(command);
+    if (value.length() > 0) {
+        query.append(" ");
+        query.append(value);
+    }
+    fragment.clear();
+
+    // assemble the tasmota device url
+    Url url(protocol, host, path, query, fragment);
+    return url.getUrl();
 }
 
 
@@ -184,19 +208,22 @@ std::string TasmotaAPI::setValue(const std::string& name, const std::string& val
  * Get the json response for the given command om the tasmota device.
  * An http get request is send to "http://'host_url'/cm?cmnd='command'.
  * @param command the tasmota command string.
+ * @param error
  * @return the json response tree.
  */
-json_value* TasmotaAPI::getJsonResponse(const std::string& command) {
-    // assemble host_url + command
-    std::string device_url(host_url);
-    device_url.append("cm?cmnd=");
-    device_url.append(command);
+json_value* TasmotaAPI::getJsonResponse(const std::string& command, std::string& http_status) {
+    // assemble the tasmota device url
+    std::string device_url = assembleHttpUrl(command);
 
     // send http get status request
     HttpClient http_client;
     std::string response;
     std::string content;
     int http_return_code = http_client.sendHttpGetRequest(device_url, response, content);
+
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "HTTP-Returncode: %d : ", http_return_code);
+    http_status = std::string(buffer).append(content);
 
     // check if the http return code is 200 OK
     if (http_return_code == 200) {

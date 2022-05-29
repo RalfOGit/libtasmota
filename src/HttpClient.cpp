@@ -336,7 +336,7 @@ int HttpClient::parse_http_response(const std::string& answer, std::string& http
 
     // extract http return code
     int http_return_code = get_http_return_code((char*)answer.c_str(), answer.length());
-    if (http_return_code < 0 || http_return_code == 404) {
+    if (http_return_code < 0) {
         http_response = answer;
         return -1;
     }
@@ -408,7 +408,7 @@ int HttpClient::get_http_return_code(char* buffer, size_t buffer_size) {
     buffer[buffer_size] = saved_character;
     if (substr != NULL) {
         substr += strlen("HTTP/1.1 ");
-        int return_code = 404;
+        int return_code = -1;
         if ((size_t)(substr - buffer) < buffer_size && sscanf(substr, " %d", &return_code) == 1) {
             return return_code;
         }

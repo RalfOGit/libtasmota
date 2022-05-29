@@ -47,8 +47,9 @@ namespace libtasmota {
 
         std::string host_url;
 
-        json_value* getJsonResponse(const std::string& command);
-        std::string getValueFromJson(const json_value* const json, const std::string& name);
+        std::string assembleHttpUrl(const std::string& command, const std::string& value = "");
+        json_value* getJsonResponse(const std::string& command, std::string& http_status);
+        static std::string getValueFromJson(const json_value* const json, const std::string& name);
         static bool compareNames(const std::string& name1, const std::string& name2, const bool strict);
         static std::vector<std::string> getPathSegments(const std::string& path);
 
@@ -64,7 +65,7 @@ namespace libtasmota {
         std::map<std::string, std::string> getModules(void);                        // get a vector of modules supported by the firmware
 
         // Set accessor methods.
-        std::string setValue(const std::string& name, const std::string& value);    // e.g. "Power", can be used if key is unique
+        std::string setValue(const std::string& name, const std::string& value);    // e.g. "Power", can be used if name is well-known and documented
 
     };
 
