@@ -49,13 +49,12 @@ TasmotaAPI::TasmotaAPI(const std::string& url) :
  * @return a map of module id and module name pairs
  */
 std::map<std::string, std::string> TasmotaAPI::getModules(void) {
+    std::map<std::string, std::string> modules;
 
     // get json response from device
     std::string http_status;
     json_value* json = getJsonResponse("Modules", http_status);
     if (json != NULL) {
-
-        std::map<std::string, std::string> modules;
 
         // get Modules element and all sub-elements
         const JsonCppWrapper::JsonNamedValueVector roots = JsonCppWrapper::getNamedValues(json);
@@ -67,10 +66,10 @@ std::map<std::string, std::string> TasmotaAPI::getModules(void) {
                 const json_object_entry& element = elements[i];
                 modules[element.name] = std::string(element.value->u.string.ptr, element.value->u.string.length);
             }
-            return modules;
         }
+        json_value_free(json);
     }
-    return std::map<std::string, std::string>();
+    return modules;
 }
 
 
@@ -80,17 +79,18 @@ std::map<std::string, std::string> TasmotaAPI::getModules(void) {
  * @return the value of the key value pair
  */
 std::string TasmotaAPI::getValue(const std::string& name) {
+    std::string http_status, value;
 
     // get json response from device
-    std::string http_status;
     json_value* json = getJsonResponse(name, http_status);
     if (json != NULL) {
 
         // search json for the given name
-        std::string value = getValueFromJson(json, name);
-        if (value.length() > 0) {
-            return value;
-        }
+        value = getValueFromJson(json, name);
+        json_value_free(json);
+    }
+    if (value.length() > 0) {
+        return value;
     }
     return http_status;
 }
@@ -104,9 +104,9 @@ std::string TasmotaAPI::getValue(const std::string& name) {
  * @return the value of the key value pair
  */
 std::string TasmotaAPI::getValueFromPath(const std::string& path) {
+    std::string http_status, value;
 
     // get json response from device
-    std::string http_status;
     json_value* json = getJsonResponse("Status%200", http_status);
     if (json != NULL) {
 
@@ -136,8 +136,12 @@ std::string TasmotaAPI::getValueFromPath(const std::string& path) {
         }
         if (values != NULL && length != 0 && path_segments.size() > 0) {
             JsonCppWrapper::JsonNamedValue leaf = JsonCppWrapper::getValue(values, length, path_segments[path_segments.size()-1], NameComparator::compare_leaf_names);
-            return leaf.getValueAsString();
+            value = leaf.getValueAsString();
         }
+        json_value_free(json);
+    }
+    if (value.length() > 0) {
+        return value;
     }
     return http_status;
 }
@@ -165,6 +169,7 @@ std::string TasmotaAPI::setValue(const std::string& name, const std::string& val
 
             // search json for the given name
             std::string value = getValueFromJson(json, name);
+            json_value_free(json);
             if (value.length() > 0) {
                 return value;
             }
