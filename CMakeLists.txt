@@ -7,6 +7,9 @@ set(CMAKE_CXX_STANDARD 17)
 
 project ("tasmota")
 
+#
+# Target:  ${PROJECT_NAME}  =>  create tasmota.lib or libtasmota.a
+#
 set(COMMON_SOURCES
     src/TasmotaAPI.cpp
     src/HttpClient.cpp
@@ -14,24 +17,25 @@ set(COMMON_SOURCES
     src/Logger.cpp
     src/Url.cpp
 )
+set(INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 
 add_library(${PROJECT_NAME} STATIC
     ${COMMON_SOURCES} 
 )
+target_include_directories(${PROJECT_NAME} PUBLIC ${INCLUDE_DIR})
 
-target_include_directories(${PROJECT_NAME}
-PUBLIC
-    include
-)
-
-
+#
+# Target:  ${PROJECT_NAME}_test  =>  create tasmota_test.exe
+#
 set(TEST_SOURCES
     src/Test.cpp
 )
-set(TEST_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
-include_directories(${TEST_INCLUDE_DIR})
+set(TEST_INCLUDE_DIR ${INCLUDE_DIR})
+
 add_executable(${PROJECT_NAME}_test ${TEST_SOURCES} )
 add_dependencies(${PROJECT_NAME}_test ${PROJECT_NAME})
+
+target_include_directories(${PROJECT_NAME}_test PUBLIC ${TEST_INCLUDE_DIR})
 
 if (MSVC)
 target_link_libraries(${PROJECT_NAME}_test tasmota.lib ws2_32.lib Iphlpapi.lib)
@@ -40,6 +44,8 @@ target_link_libraries(${PROJECT_NAME}_test libtasmota.a)
 endif()
 
 set_target_properties(${PROJECT_NAME}
-    PROPERTIES OUTPUT_NAME ${PROJECT_NAME}
+    PROPERTIES 
+    OUTPUT_NAME ${PROJECT_NAME}_test
+    ARCHIVE_OUTPUT_NAME ${PROJECT_NAME}
 )
-install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX})
+install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_test RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX})
