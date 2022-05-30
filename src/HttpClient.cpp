@@ -28,6 +28,7 @@
 
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <Winsock2.h>
 #include <Ws2tcpip.h>
 #define poll(a, b, c)  WSAPoll((a), (b), (c))
@@ -46,16 +47,50 @@ using namespace libtasmota;
 
 
 /**
- *  Convert an ipv4 string to an ipv4 binary address
+ *  Convert a hostname or ip address string to a binary socket address.
+ *  It returns a sockaddr_in6 structure, as the sockaddr structure is not large enough to hold ipv6 socket data.
+ *  @param host a host ipv4, ipv6 address or a hostname
+ *  @param port the ip port
+ *  @return a socket address structure containing sockaddr_in or sockaddr_in6 data, or zero bytes in case of a conversion error
  */
-static struct in_addr toInAddress(const std::string& ipv4_address) {
-    struct in_addr addr;
-    memset(&addr, 0, sizeof(addr));
-    if (inet_pton(AF_INET, ipv4_address.c_str(), &(addr)) != 1) {
-        perror("inet_pton failure");
+static struct sockaddr_in6 toSocketAddress(const std::string& host, unsigned short port) {
+    struct sockaddr_in6 socket_address_v6;  memset(&socket_address_v6, 0, sizeof(socket_address_v6));
+    struct sockaddr_in& socket_address_v4 = (struct sockaddr_in&)socket_address_v6;
+
+    // check if an ip4 address was given, if so return a sockaddr_in
+    struct in_addr inv4_addr;
+    if (inet_pton(AF_INET, host.c_str(), &inv4_addr) == 1) {
+        socket_address_v4.sin_family = AF_INET;
+        socket_address_v4.sin_addr   = inv4_addr;
+        socket_address_v4.sin_port   = htons(port);
+        return socket_address_v6;
     }
-    return addr;
+    // check if an ip6 address was given, if so return a sockaddr_in6
+    struct in6_addr inv6_addr;
+    std::string::size_type imask = host.find_first_of('%');
+    std::string ipv6 = ((imask == std::string::npos) ? host : host.substr(0, imask));
+    if (inet_pton(AF_INET6, ipv6.c_str(), &inv6_addr) == 1) {
+        socket_address_v6.sin6_family = AF_INET6;
+        socket_address_v6.sin6_addr   = inv6_addr;
+        socket_address_v6.sin6_port   = htons(port);
+        return socket_address_v6;
+    }
+    // check if a hostname was given, if so return a sockaddr_in
+    hostent *entries = gethostbyname(host.c_str());
+    if (entries != NULL && entries->h_addrtype == AF_INET && entries->h_length == 4 && entries->h_addr_list != NULL) {
+        unsigned char* entry = (unsigned char*)*entries->h_addr_list;
+        char buffer[64];
+        snprintf(buffer, sizeof(buffer), "%d.%d.%d.%d", entry[0], entry[1], entry[2], entry[3]);
+        if (inet_pton(AF_INET, buffer, &inv4_addr) == 1) {
+            socket_address_v4.sin_family = AF_INET;
+            socket_address_v4.sin_addr   = inv4_addr;
+            socket_address_v4.sin_port   = htons(port);
+            return socket_address_v6;
+        }
+    }
+    return socket_address_v6;
 }
+
 
 /**
  *  Close the given socket in a platform portable way.
@@ -178,12 +213,10 @@ int HttpClient::connect_to_server(const std::string& url, std::string& host, std
     }
 
     // open connection to http server
-    struct sockaddr_in http_server;
-    http_server.sin_family = AF_INET;
-    http_server.sin_addr = toInAddress(host);
-    http_server.sin_port = htons(port);
+    struct sockaddr_in6 socket_address = toSocketAddress(host, port);
+    int          socket_address_length = (socket_address.sin6_family == AF_INET ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
 
-    if (connect(socket_fd, (sockaddr*)&http_server, sizeof(struct sockaddr_in)) < 0) {
+    if (connect(socket_fd, (sockaddr*)&socket_address, socket_address_length) < 0) {
         perror("connecting stream socket failure");
         close_socket(socket_fd);
         return -1;
