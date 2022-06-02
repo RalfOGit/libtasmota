@@ -31,6 +31,6 @@ namespace libtasmota {
         size_t get_next_chunk_offset(char* buffer, size_t buffer_size);
     };
 
-}   // namespace libgoecharger
+}   // namespace libtasmota
 
 #endif
