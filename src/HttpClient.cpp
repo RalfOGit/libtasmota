@@ -173,10 +173,12 @@ int HttpClient::connect_to_server(const std::string& url, std::string& host, std
     if (getaddrinfo(host.c_str(), buffer, NULL, &addr) == 0) {
         while (addr != NULL) {
             if (connect(socket_fd, addr->ai_addr, (int)addr->ai_addrlen) >= 0) {
+                freeaddrinfo(addr);
                 return socket_fd;
             }
             addr = addr->ai_next;
         }
+       freeaddrinfo(addr);
     }
     perror("connecting stream socket failure");
     close_socket(socket_fd);
