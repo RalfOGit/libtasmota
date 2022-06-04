@@ -101,8 +101,8 @@ namespace libtasmota {
         std::string  m_module_name;
         std::wstring m_module_name_w;
 
-        void operator()(LogLevel level, const char*    format, const va_list& list) const;
-        void operator()(LogLevel level, const wchar_t* format, const va_list& list) const;
+        void operator()(LogLevel level, const char*    format, va_list& list) const;
+        void operator()(LogLevel level, const wchar_t* format, va_list& list) const;
     };
 
     template <class CharType> inline void Logger::error(const CharType* format, ...) const {

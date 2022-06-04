@@ -35,10 +35,9 @@
 #else
 #include <unistd.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
+#include <netdb.h>
 #include <poll.h>
 #include <string.h>
-#include <arpa/inet.h>
 #endif
 
 #include <HttpClient.hpp>

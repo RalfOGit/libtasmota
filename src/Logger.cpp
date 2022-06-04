@@ -43,7 +43,7 @@ void Logger::setLogOutput(ILogListener& listener, const LogLevel level) {
  * @param format The standard printf format string
  * @param ... A variable argument list
  */
-void Logger::operator()(LogLevel level, const char* format, const va_list& list) const {
+void Logger::operator()(LogLevel level, const char* format, va_list& list) const {
     std::string text;
 
 #ifdef PRINT_TIMESTAMP
@@ -98,7 +98,7 @@ void Logger::operator()(LogLevel level, const char* format, const va_list& list)
  * @param format The standard printf format string
  * @param ... A variable argument list
  */
-void Logger::operator()(LogLevel level, const wchar_t* format, const va_list& list) const {
+void Logger::operator()(LogLevel level, const wchar_t* format, va_list& list) const {
     std::wstring text;
 
 #ifdef PRINT_TIMESTAMP
