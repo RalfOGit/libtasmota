@@ -40,7 +40,7 @@ target_include_directories(${PROJECT_NAME}_test PUBLIC ${TEST_INCLUDE_DIR})
 if (MSVC)
 target_link_libraries(${PROJECT_NAME}_test tasmota.lib ws2_32.lib Iphlpapi.lib)
 else()
-target_link_libraries(${PROJECT_NAME}_test libtasmota.a)
+target_link_libraries(${PROJECT_NAME}_test ${CMAKE_SOURCE_DIR}/build/libtasmota.a)
 endif()
 
 set_target_properties(${PROJECT_NAME}
