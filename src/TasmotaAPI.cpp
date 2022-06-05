@@ -48,7 +48,7 @@ TasmotaAPI::TasmotaAPI(const std::string& url) :
  * Get a vector of modules supported by the firmware.
  * @return a map of module id and module name pairs
  */
-std::map<std::string, std::string> TasmotaAPI::getModules(void) {
+std::map<std::string, std::string> TasmotaAPI::getModules(void) const {
     std::map<std::string, std::string> modules;
 
     // get json response from device
@@ -78,7 +78,7 @@ std::map<std::string, std::string> TasmotaAPI::getModules(void) {
  * @param key the name of the key value pair
  * @return the value of the key value pair
  */
-std::string TasmotaAPI::getValue(const std::string& name) {
+std::string TasmotaAPI::getValue(const std::string& name) const {
     std::string http_status, value;
 
     // get json response from device
@@ -103,7 +103,7 @@ std::string TasmotaAPI::getValue(const std::string& name) {
  * @param key the key path of the key value pair. e.g. "StatusSNS:ENERGY:Power" to get the power consumption
  * @return the value of the key value pair
  */
-std::string TasmotaAPI::getValueFromPath(const std::string& path) {
+std::string TasmotaAPI::getValueFromPath(const std::string& path) const {
     std::string http_status, value;
 
     // get json response from device
@@ -188,7 +188,7 @@ std::string TasmotaAPI::setValue(const std::string& name, const std::string& val
  * @param value the value if this is a set command; provide an empty string for get commands
  * @return the device url, i.e. something like "http://192.168.1.2:80/cm?cmnd=Status%200"
  */
-std::string TasmotaAPI::assembleHttpUrl(const std::string& command, const std::string& value) {
+std::string TasmotaAPI::assembleHttpUrl(const std::string& command, const std::string& value) const {
     // parse the given host_url to separate protocol and host
     std::string protocol, host, path, query, fragment; int port;
     Url::parseUrl(host_url, protocol, host, port, path, query, fragment);
@@ -216,7 +216,7 @@ std::string TasmotaAPI::assembleHttpUrl(const std::string& command, const std::s
  * @param error
  * @return the json response tree.
  */
-json_value* TasmotaAPI::getJsonResponse(const std::string& command, std::string& http_status) {
+json_value* TasmotaAPI::getJsonResponse(const std::string& command, std::string& http_status) const {
     // assemble the tasmota device url
     std::string device_url = assembleHttpUrl(command);
 
