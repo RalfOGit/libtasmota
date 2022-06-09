@@ -28,6 +28,28 @@ In case of errors, the result string, may contain error information. To help dis
 
 Libtasmota is self-contained, i.e. it does not have any external library dependencies. Cudos to the very small footprint json parser written by James McLaughlin: https://github.com/udp/json-parser, which is included in the library.
 
+The simplest way to build this library together with your code is to checkout this library into a separate folder and use unix symbolic links (ln -s ...) or ntfs junctions (mklink /J ...) to integrate it as a sub-folder within your projects folder.
+
+For example, if you are developing on a Windows host and your projects reside in C:\workspaces:
+
+    cd C:\workspaces
+    mkdir libtasmota
+    git clone https://github.com/RalfOGit/libtasmota
+    cd ..\YOUR_PROJECT_FOLDER
+    mklink /J libtasmota ..\libtasmota
+    Now you can start Visual Studio
+    And in Visual Studio open folder YOUR_PROJECT_FOLDER
+
+And if you are developing on a Linux host and your projects reside in /home/YOU/workspaces:
+
+    cd /home/YOU/workspaces
+    mkdir libtasmota
+    git clone https://github.com/RalfOGit/libtasmota
+    cd ../YOUR_PROJECT_FOLDER
+    ln -s ../libtasmota
+    Now you can start VSCode
+    And in VSCode open folder YOUR_PROJECT_FOLDER
+
 The source code contains doxygen comments, so that you can generate documentation for the library.
 
 For now, libtasmota supports just plain http as the underlying network protocol. There is neither authentication nor encryption support.
