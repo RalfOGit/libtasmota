@@ -3,7 +3,7 @@ A C++ library to access tasmota devices.
 
 It provides methods to get and set all defined properties of a tasmota device via the local http network api. The API is coded in class TasmotaAPI. Usage of this class is rather straightforward:
 
-        TasmotaAPI api("http://192.168.178.117/");
+        TasmotaAPI api("http://192.168.178.117/");          // configure the tasmota device, "http://tasmota-123456-7890/" would also work
         
         std::string val1 = api.getValue("Module");          // get name of the tasmota device
         std::string val2 = api.getValue("AP");              // get name of the wifi access point
