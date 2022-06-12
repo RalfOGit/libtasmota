@@ -158,7 +158,7 @@ std::string TasmotaAPI::setValue(const std::string& name, const std::string& val
     HttpClient http_client;
     std::string response;
     std::string content;
-    int http_return_code = http_client.sendHttpPutRequest(device_url, response, content);
+    int http_return_code = http_client.sendHttpPutRequest(device_url, "", response, content);
 
     // check if the http return code is 200 OK
     if (http_return_code == 200) {
