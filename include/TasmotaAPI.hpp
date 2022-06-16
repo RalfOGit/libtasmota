@@ -34,13 +34,15 @@
 #include <map>
 #include <JsonCppWrapper.hpp>
 
-
-/**
- * Class implementing an API for tasmota devices.
- */
-
+#ifdef LIB_NAMESPACE
+namespace LIB_NAMESPACE {
+#else
 namespace libtasmota {
+#endif
 
+    /**
+     * Class implementing an API for tasmota devices.
+     */
     class TasmotaAPI {
 
     protected:

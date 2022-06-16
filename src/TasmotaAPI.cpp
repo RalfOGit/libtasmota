@@ -32,8 +32,11 @@
 #include <JsonCppWrapper.hpp>
 #include <locale>
 
+#ifdef LIB_NAMESPACE
+using namespace LIB_NAMESPACE;
+#else
 using namespace libtasmota;
-
+#endif
 
 /**
  * Constructor.

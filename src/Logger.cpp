@@ -1,7 +1,12 @@
 #include <string>
 #include <cstdarg>
 #include <Logger.hpp>
+
+#ifdef LIB_NAMESPACE
+using namespace LIB_NAMESPACE;
+#else
 using namespace libtasmota;
+#endif
 
 //#define PRINT_TIMESTAMP
 

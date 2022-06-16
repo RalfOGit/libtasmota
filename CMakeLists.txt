@@ -6,16 +6,15 @@ cmake_minimum_required (VERSION 3.8)
 set(CMAKE_CXX_STANDARD 17)
 
 project ("tasmota")
-message("PROJECT_NAME ${PROJECT_NAME}")
 
 #
 # Target:  ${PROJECT_NAME}  =>  create tasmota.lib or libtasmota.a
 #
 set(COMMON_SOURCES
     src/TasmotaAPI.cpp
-    src/HttpClient.cpp
     src/Json.cpp
     src/Logger.cpp
+    src/HttpClient.cpp
     src/Url.cpp
 )
 set(INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
@@ -24,6 +23,10 @@ add_library(${PROJECT_NAME} STATIC
     ${COMMON_SOURCES} 
 )
 target_include_directories(${PROJECT_NAME} PUBLIC ${INCLUDE_DIR})
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    LIB_NAMESPACE=libtasmota
+)
 
 #
 # Target:  ${PROJECT_NAME}_test  =>  create tasmota_test.exe
@@ -37,6 +40,10 @@ add_executable(${PROJECT_NAME}_test ${TEST_SOURCES} )
 add_dependencies(${PROJECT_NAME}_test ${PROJECT_NAME})
 
 target_include_directories(${PROJECT_NAME}_test PUBLIC ${TEST_INCLUDE_DIR})
+
+target_compile_definitions(${PROJECT_NAME}_test PRIVATE
+    LIB_NAMESPACE=libtasmota
+)
 
 if (MSVC)
 target_link_libraries(${PROJECT_NAME}_test tasmota.lib ws2_32.lib Iphlpapi.lib)

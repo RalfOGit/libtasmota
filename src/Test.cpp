@@ -1,13 +1,18 @@
 #if 1
 #include <TasmotaAPI.hpp>
+
+#ifdef LIB_NAMESPACE
+using namespace LIB_NAMESPACE;
+#else
 using namespace libtasmota;
+#endif
 
 int main(int argc, char** argv) {
 
     // configure tasmota API
-    TasmotaAPI api1("http://192.168.178.117/");
+    TasmotaAPI api2("http://192.168.178.117/");
     //TasmotaAPI api2("http://192.168.178.118/");
-    TasmotaAPI api2("http://tasmota-994e5a-3674/");
+    //TasmotaAPI api2("http://tasmota-994e5a-3674/");
 
     std::string val1 = api2.getValueFromPath("StatusSNS:ENERGY:Power");
     std::map<std::string, std::string> map = api2.getModules();

@@ -36,8 +36,11 @@
 #include <variant>
 #include <utility>
 
-
+#ifdef LIB_NAMESPACE
+namespace LIB_NAMESPACE {
+#else
 namespace libtasmota {
+#endif
 
     /**
      * Class implementing a C++ wrapper for the very low-print json parsing library written by James McLaughlin

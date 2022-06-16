@@ -37,7 +37,7 @@
 #include <stdint.h>
 #endif
 
-//using namespace libtasmota;
+//using namespace LIB_NAMESPACE;
 
 
 const struct _json_value json_value_none;

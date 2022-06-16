@@ -1,6 +1,6 @@
 /*
  * Copyright(C) 2022 RalfO. All rights reserved.
- * https://github.com/RalfOGit/libtasmota
+ * https://github.com/RalfOGit
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -42,7 +42,11 @@
 #include <HttpClient.hpp>
 #include <Url.hpp>
 
-using namespace libtasmota;
+#ifdef LIB_NAMESPACE
+using namespace LIB_NAMESPACE;
+#else
+using namespace libralfogit;
+#endif
 
 /**
  *  Close the given socket in a platform portable way.

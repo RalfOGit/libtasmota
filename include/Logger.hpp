@@ -4,7 +4,11 @@
 #include <string>
 #include <cstdarg>
 
+#ifdef LIB_NAMESPACE
+namespace LIB_NAMESPACE {
+#else
 namespace libtasmota {
+#endif
 
     /*! \file */
     /**

@@ -1,6 +1,6 @@
 /*
  * Copyright(C) 2022 RalfO. All rights reserved.
- * https://github.com/RalfOGit/libtasmota
+ * https://github.com/RalfOGit
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,7 +28,12 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 #include <Url.hpp>
-using namespace libtasmota;
+
+#ifdef LIB_NAMESPACE
+using namespace LIB_NAMESPACE;
+#else
+using namespace libralfogit;
+#endif
 
 
 /**
