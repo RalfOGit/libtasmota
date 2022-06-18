@@ -193,8 +193,8 @@ std::string TasmotaAPI::setValue(const std::string& name, const std::string& val
  */
 std::string TasmotaAPI::assembleHttpUrl(const std::string& command, const std::string& value) const {
     // parse the given host_url to separate protocol and host
-    std::string protocol, host, path, query, fragment; int port;
-    Url::parseUrl(host_url, protocol, host, port, path, query, fragment);
+    std::string protocol, user, password, host, path, query, fragment; int port;
+    Url::parseUrl(host_url, protocol, user, password, host, port, path, query, fragment);
 
     // overwrite path, query and fragment url components to reflect the given command
     path  = "/cm";
@@ -207,7 +207,7 @@ std::string TasmotaAPI::assembleHttpUrl(const std::string& command, const std::s
     fragment.clear();
 
     // assemble the tasmota device url
-    Url url(protocol, host, path, query, fragment);
+    Url url(protocol, user, password, host, path, query, fragment);
     return url.getUrl();
 }
 

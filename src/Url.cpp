@@ -54,25 +54,31 @@ Url::Url(void) :
 Url::Url(const std::string& url_) :
     url(url_),
     protocol(),
+    user(),
+    password(),
     host(),
     port(0),
     path(),
     query(),
     fragment()
 {
-    parseUrl(url, protocol, host, port, path, query, fragment);
+    parseUrl(url, protocol, host, user, password, port, path, query, fragment);
 }
 
 /**
  * Constructor providing parsing results of the given url - eg "http://192.168.178.19/status".
  * @param protocol_ the url protocol, e.g. "http"
+ * @param user_ the user credential part, e.g. ://user:password@
+ * @param password_ the password credential part, e.g. ://user:password@
  * @param host_ the host ip address, e.g. "192.168.1.2"
  * @param path_ the path, e.g. "/some_path"
  * @param query_ the optional query part of the url, e.g. "?some_query"
  * @param fragment_ the optional fragment part of the url, e.g. "#some_fragment"
  */
-Url::Url(const std::string& protocol_, const std::string& host_, const std::string& path_, const std::string& query_, const std::string& fragment_) :
+Url::Url(const std::string& protocol_, const std::string& user_, const std::string& password_, const std::string& host_, const std::string& path_, const std::string& query_, const std::string& fragment_) :
     protocol(protocol_),
+    user(user_),
+    password(password_),
     host(host_),
     path(path_),
     query(query_),
@@ -85,6 +91,12 @@ Url::Url(const std::string& protocol_, const std::string& host_, const std::stri
 
     url = protocol;
     url.append("://");
+    if (user.length() > 0 || password.length() > 0) {
+        url.append(user);
+        url.append(":");
+        url.append(password);
+        url.append("@");
+    }
     url.append(host);
     if (protocol == "http") {
         url.append(":80");
@@ -103,7 +115,7 @@ Url::Url(const std::string& protocol_, const std::string& host_, const std::stri
  * Get url string.
  * @return the url
  */
-std::string Url::getUrl(void) {
+const std::string& Url::getUrl(void) const {
     return url;
 }
 
@@ -111,15 +123,31 @@ std::string Url::getUrl(void) {
  * Get protocol part of the url as string.
  * @return the protocol
  */
-std::string Url::getProtocol(void) {
+const std::string& Url::getProtocol(void) const {
     return protocol;
+}
+
+/**
+ * Get user part of the url as string.
+ * @return the user or ""
+ */
+const std::string& Url::getUser(void) const {
+    return user;
+}
+
+/**
+ * Get password part of the url as string.
+ * @return the password or ""
+ */
+const std::string& Url::getPassword(void) const {
+    return password;
 }
 
 /**
  * Get host part of the url as string.
  * @return the host name
  */
-std::string Url::getHost(void) {
+const std::string& Url::getHost(void) const {
     return host;
 }
 
@@ -127,7 +155,7 @@ std::string Url::getHost(void) {
  * Get port number part of the url as integer.
  * @return the port number
  */
-int Url::getPort(void) {
+const int Url::getPort(void) const {
     return port;
 }
 
@@ -135,7 +163,7 @@ int Url::getPort(void) {
  * Get path part of the url as string.
  * @return the path
  */
-std::string Url::getPath(void) {
+const std::string& Url::getPath(void) const {
     return path;
 }
 
@@ -143,7 +171,7 @@ std::string Url::getPath(void) {
  * Get query part of the url as string.
  * @return the path
  */
-std::string Url::getQuery(void) {
+const std::string& Url::getQuery(void) const {
     return query;
 }
 
@@ -151,7 +179,7 @@ std::string Url::getQuery(void) {
  * Get fragment part of the url as string.
  * @return the path
  */
-std::string Url::getFragment(void) {
+const std::string& Url::getFragment(void) const {
     return fragment;
 }
 
@@ -166,37 +194,40 @@ std::string Url::getFragment(void) {
  * @param fragment output - the fragment part of the url
  * @return 0: if successful, -1: if unsuccesful
  */
-int Url::parseUrl(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& path, std::string& query, std::string& fragment) {
+int Url::parseUrl(const std::string& url, std::string& protocol, std::string& user, std::string& password, std::string& host, int& port, std::string& path, std::string& query, std::string& fragment) {
     std::string::size_type offs = 0;
 
     // parse protocol
-    std::string::size_type i1 = url.find("http:", offs);
-    if (i1 != std::string::npos) {
-        protocol = "http";
-        port = 80;
-        offs = i1 + 4;
+    std::string::size_type offs_protocol_end = url.find("://", offs);
+    if (offs_protocol_end != std::string::npos) {
+        protocol = url.substr(0, offs_protocol_end);
+        if (protocol == "http" ) { port = 80; }
+        if (protocol == "https") { port = 443; }
+        offs = offs_protocol_end + 3;
     }
-    else {
-        i1 = url.find("https:", offs);
-        if (i1 != std::string::npos) {
-            protocol = "https";
-            port = 443;
-            offs = i1 + 5;
+
+    // parse credentials
+    std::string::size_type offs_credential_end = url.find_first_of("@/", offs);
+    if (offs_credential_end != std::string::npos && url[offs_credential_end] == '@') {
+        std::string credential = url.substr(offs, offs_credential_end - offs);
+        std::string::size_type i = credential.find(":");
+        if (i != std::string::npos) {
+            user = credential.substr(0, i);
+            password = credential.substr(i + 1);
         }
         else {
-            return -1;
+            user = credential;
+            password = "";
         }
+        offs = offs_credential_end + 1;
     }
 
     // parse hostname
-    std::string::size_type i2 = url.find("://", offs);
-    std::string::size_type i3 = std::string::npos;
-    if (i2 == offs) {
-        offs = i2 + 3;
-        i3 = url.find_first_of(":/", offs);
-        if (i3 != std::string::npos) {
-            host = url.substr(offs, i3 - offs);
-            offs = i3;
+    if (offs_protocol_end != std::string::npos) {
+        std::string::size_type i = url.find_first_of(":/", offs);
+        if (i != std::string::npos) {
+            host = url.substr(offs, i - offs);
+            offs = i;
         }
         else {
             return -1;
@@ -207,9 +238,9 @@ int Url::parseUrl(const std::string& url, std::string& protocol, std::string& ho
     }
 
     // parse port
-    std::string::size_type i4 = url.find(":", offs);
-    if (i4 == offs) {
-        offs = i4 + 1;
+    std::string::size_type offs_port = url.find(":", offs);
+    if (offs_port == offs) {
+        offs = offs_port + 1;
         int n = sscanf(url.c_str() + offs, "%d", &port);
         if (n != 1) {
             return -1;
@@ -217,16 +248,16 @@ int Url::parseUrl(const std::string& url, std::string& protocol, std::string& ho
     }
 
     // parse path
-    std::string::size_type i5 = url.find("/", offs);
-    if (i5 != std::string::npos) {
-        offs = i5;
-        std::string::size_type i6 = url.find_first_of("?#", offs);
-        if (i6 != std::string::npos) {
-            path = url.substr(i5, i6 - offs);
-            offs = i6;
+    std::string::size_type offs_path = url.find("/", offs);
+    if (offs_path != std::string::npos) {
+        offs = offs_path;
+        std::string::size_type i = url.find_first_of("?#", offs);
+        if (i != std::string::npos) {
+            path = url.substr(offs_path, i - offs);
+            offs = i;
         }
         else {
-            path = url.substr(i5);
+            path = url.substr(offs_path);
         }
     }
     else {
@@ -234,16 +265,16 @@ int Url::parseUrl(const std::string& url, std::string& protocol, std::string& ho
     }
 
     // parse query
-    std::string::size_type i7 = url.find("?", offs);
-    if (i7 != std::string::npos) {
-        offs = i7 + 1;
-        std::string::size_type i8 = url.find("#", offs);
-        if (i8 != std::string::npos) {
-            query = url.substr(i7, i8 - offs);
-            offs = i8;
+    std::string::size_type offs_query = url.find("?", offs);
+    if (offs_query != std::string::npos) {
+        offs = offs_query + 1;
+        std::string::size_type i = url.find("#", offs);
+        if (i != std::string::npos) {
+            query = url.substr(offs_query, i - offs);
+            offs = i;
         }
         else {
-            query = url.substr(i7);
+            query = url.substr(offs_query);
         }
     }
     else {
@@ -251,9 +282,9 @@ int Url::parseUrl(const std::string& url, std::string& protocol, std::string& ho
     }
 
     // parse fragment
-    std::string::size_type i9 = url.find("#", offs);
-    if (i9 != std::string::npos) {
-        offs = i9 + 1;
+    std::string::size_type offs_fragment = url.find("#", offs);
+    if (offs_fragment != std::string::npos) {
+        offs = offs_fragment + 1;
         fragment = url.substr(offs);
     }
     else {
@@ -264,6 +295,8 @@ int Url::parseUrl(const std::string& url, std::string& protocol, std::string& ho
     path     = percentEncode(path,     '/');
     query    = percentEncode(query,    '?');
     fragment = percentEncode(fragment, '#');
+    user     = percentEncode(user,     '@');
+    password = percentEncode(password, '@');
 
     return 0;
 }
@@ -271,15 +304,15 @@ int Url::parseUrl(const std::string& url, std::string& protocol, std::string& ho
 /**
  * Replace special characters in the query with their %hex url encoding; e.g. ' ' is replace by %20
  * @param url_component input - the input string
- * @param url_component_identifier input - the first character in the url component, i.e. '/', '?' or '#'
+ * @param url_component_identifier input - the first character in the url component, i.e. '/', '?', '#' or '@'
  * @return the input string, where all special characters are replaced
  */
 std::string Url::percentEncode(const std::string& url_component, const std::string::value_type url_component_identifier) {
     std::string result;
     size_t offs = 0;
 
-    // keep the first '/', '?' or '#' character
-    if (url_component.length() > 1) {
+    // keep the first '/', '?' or '#' character (don't do this for '@'!)
+    if (url_component.length() > 0) {
         if (url_component[0] == url_component_identifier) {
             result.append(1, url_component_identifier);
             offs = 1;
@@ -294,6 +327,7 @@ std::string Url::percentEncode(const std::string& url_component, const std::stri
         //   path component:      pchar    = unreserved / pct-encoded / sub-delims / ":" / "@"
         //   query component:     query    = *(pchar / "/" / "?")
         //   fragment component:  fragment = *(pchar / "/" / "?")
+        //   userinfo component:  userinfo = unreserved / pct-encoded / sub-delims / ":")
         bool unreserved = (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' ||
                            c >= '0' && c <= '9' || c == '-' || c == '.' || c == '_' || c == '~');
         bool subdelims  = (c == '!' || c == '$' || c == '&' || c == '\''|| c == '(' || c == ')' ||
@@ -302,9 +336,26 @@ std::string Url::percentEncode(const std::string& url_component, const std::stri
         bool extra_qf   = (c == '/' || c == '?');
 
         // copy any allowed character to the result string
-        if (unreserved || subdelims || extra || (url_component_identifier == '?' || url_component_identifier == '#') && extra_qf) {
-            result.append(1, c);
-            continue;
+        switch (url_component_identifier) {
+            case '/' : 
+                if (unreserved || subdelims || extra) {
+                    result.append(1, c);
+                    continue;
+                }
+                break;
+            case '?':
+            case '#':
+                if (unreserved || subdelims || extra || extra_qf) {
+                    result.append(1, c);
+                    continue;
+                }
+                break;
+            case '@':
+                if (unreserved || subdelims || c == ':') {
+                    result.append(1, c);
+                    continue;
+                }
+                break;
         }
         // copy any pct-encoded character (i.e. "%" HEXDIG HEXDIG) to the result string
         if (c == '%' && (i+2) < url_component.length()) {

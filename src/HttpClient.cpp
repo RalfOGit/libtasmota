@@ -154,11 +154,13 @@ int HttpClient::connect_to_server(const std::string& url, std::string& host, std
 
     // parse the given url
     std::string protocol;
+    std::string user;
+    std::string password;
     int         port;
     std::string path_tmp;
     std::string query;
     std::string fragment;
-    if (Url::parseUrl(url, protocol, host, port, path_tmp, query, fragment) < 0) {
+    if (Url::parseUrl(url, protocol, user, password, host, port, path_tmp, query, fragment) < 0) {
         perror("url failure");
         return -1;
     }
