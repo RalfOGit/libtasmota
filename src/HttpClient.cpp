@@ -114,10 +114,26 @@ int HttpClient::sendHttpPostRequest(const std::string& url, const std::string& r
 
 int HttpClient::sendHttpRequest(const std::string& url, const std::string& method, const std::string& request_data, std::string& response, std::string& content) {
 
-    // establish tcp connection to server
+    // parse the given url
+    std::string protocol;
+    std::string user;
+    std::string password;
     std::string host;
+    int         port;
     std::string path;
-    int socket_fd = connect_to_server(url, host, path);
+    std::string query;
+    std::string fragment;
+    if (Url::parseUrl(url, protocol, user, password, host, port, path, query, fragment) < 0) {
+        perror("url failure");
+        return -1;
+    }
+    if (protocol != "http") {
+        perror("only http is supported");
+        return -1;
+    }
+
+    // establish tcp connection to server
+    int socket_fd = connect_to_server(host, port);
     if (socket_fd < 0) {
         return socket_fd;
     }
@@ -125,7 +141,7 @@ int HttpClient::sendHttpRequest(const std::string& url, const std::string& metho
     // assemble http request
     std::string request;
     request.reserve(256 + request_data.length());
-    request.append(method).append(" ").append(path).append(" HTTP/1.1\r\n");
+    request.append(method).append(" ").append(path).append(query).append(fragment).append(" HTTP/1.1\r\n");
     request.append("Host: ").append(host).append("\r\n");
     request.append("User-Agent: ralfogit/1.0\r\n");
     request.append("Accept: */*\r\n");
@@ -133,6 +149,10 @@ int HttpClient::sendHttpRequest(const std::string& url, const std::string& metho
         char buffer[32];
         snprintf(buffer, sizeof(buffer), "Content-Length: %llu\r\n", request_data.length());
         request.append(buffer);
+    }
+    if (user.length() > 0 || password.length() > 0) {
+        std::string base64 = base64_encode(user.append(":").append(password));
+        request.append("Authorization: Basic ").append(base64).append("\r\n");
     }
     request.append("\r\n");
     request.append(request_data);
@@ -145,28 +165,11 @@ int HttpClient::sendHttpRequest(const std::string& url, const std::string& metho
 
 /**
  * Connect to the given server url.
- * @param url http put request url
  * @param host host part extracted from the given http put request url
- * @param path path part extracted from the given http put request url
+ * @param port port number to connect to
  * @return socket file descriptor, or -1 if the connect attempt failed.
  */
-int HttpClient::connect_to_server(const std::string& url, std::string& host, std::string& path) {
-
-    // parse the given url
-    std::string protocol;
-    std::string user;
-    std::string password;
-    int         port;
-    std::string path_tmp;
-    std::string query;
-    std::string fragment;
-    if (Url::parseUrl(url, protocol, user, password, host, port, path_tmp, query, fragment) < 0) {
-        perror("url failure");
-        return -1;
-    }
-    path = path_tmp;
-    path.append(query);
-    path.append(fragment);
+int HttpClient::connect_to_server(const std::string& host, const int port) {
 
     // open socket
     int socket_fd = (int)socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -533,4 +536,36 @@ size_t HttpClient::get_next_chunk_offset(char* buffer, size_t buffer_size) {
         return -1;
     }
     return ptr + 2 - buffer;
+}
+
+
+/**
+ * Base64 encoding, loosely modelled after Simon Josefssons' reference implementation for rfc3548.
+ * @param input string 
+ * @return the base64 encoded input string
+ */
+std::string HttpClient::base64_encode(const std::string& input) {
+    static const unsigned char b64_data[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    std::string output((input.length() + 2) * 2 + 1, '\0');  // initialize twice the necessary size with '\0' characters
+    const unsigned char *in = (const unsigned char*)input.data();
+    unsigned char* out = (unsigned char*)output.data();
+    std::string::size_type length = input.length();
+
+    while (length > 0) {
+        *out++ = b64_data[( in[0] >> 2) & 0x3f];
+        *out++ = b64_data[((in[0] << 4) + (--length > 0 ? in[1] >> 4 : 0)) & 0x3f];
+        *out++ = (length > 0 ? b64_data[((in[1] << 2) + (--length > 0 ? in[2] >> 6 : 0)) & 0x3f] : '=');
+        *out++ = (length > 0 ? b64_data[in[2] & 0x3f] : '=');
+        if (length > 0) {
+            length--;
+        }
+        if (length > 0) {
+            in += 3;
+        }
+    }
+
+    *out = '\0';
+    output.resize(out - (unsigned char*)output.data(), '\0');
+    return output;
 }
