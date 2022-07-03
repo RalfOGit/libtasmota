@@ -155,7 +155,7 @@ const std::string& Url::getHost(void) const {
  * Get port number part of the url as integer.
  * @return the port number
  */
-const int Url::getPort(void) const {
+int Url::getPort(void) const {
     return port;
 }
 
@@ -328,8 +328,8 @@ std::string Url::percentEncode(const std::string& url_component, const std::stri
         //   query component:     query    = *(pchar / "/" / "?")
         //   fragment component:  fragment = *(pchar / "/" / "?")
         //   userinfo component:  userinfo = unreserved / pct-encoded / sub-delims / ":")
-        bool unreserved = (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' ||
-                           c >= '0' && c <= '9' || c == '-' || c == '.' || c == '_' || c == '~');
+        bool unreserved = ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                           (c >= '0' && c <= '9') || c == '-' || c == '.' || c == '_' || c == '~');
         bool subdelims  = (c == '!' || c == '$' || c == '&' || c == '\''|| c == '(' || c == ')' ||
                            c == '*' || c == '+' || c == ',' || c == ';' || c == '=');
         bool extra      = (c == ':' || c == '@');
@@ -361,8 +361,8 @@ std::string Url::percentEncode(const std::string& url_component, const std::stri
         if (c == '%' && (i+2) < url_component.length()) {
             std::string::value_type h1 = url_component[i + 1];
             std::string::value_type h2 = url_component[i + 2];
-            if ((h1 >= 'a' && h1 <= 'f' || h1 >= 'A' && h1 <= 'F' || h1 >= '0' && h1 <= '9') &&
-                (h2 >= 'a' && h2 <= 'f' || h2 >= 'A' && h2 <= 'F' || h2 >= '0' && h2 <= '9')) {
+            if (((h1 >= 'a' && h1 <= 'f') || (h1 >= 'A' && h1 <= 'F') || (h1 >= '0' && h1 <= '9')) &&
+                ((h2 >= 'a' && h2 <= 'f') || (h2 >= 'A' && h2 <= 'F') || (h2 >= '0' && h2 <= '9'))) {
                 result.append(1, c);
                 result.append(1, h1);
                 result.append(1, h2);

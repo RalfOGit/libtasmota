@@ -53,9 +53,9 @@ using namespace libralfogit;
  */
 static void close_socket(const int socket_fd) {
 #ifdef _WIN32
-    int result = closesocket(socket_fd);
+    closesocket(socket_fd);
 #else
-    int result = close(socket_fd);
+    close(socket_fd);
 #endif
 }
 
@@ -147,7 +147,7 @@ int HttpClient::sendHttpRequest(const std::string& url, const std::string& metho
     request.append("Accept: */*\r\n");
     if (request_data.length() > 0) {
         char buffer[32];
-        snprintf(buffer, sizeof(buffer), "Content-Length: %llu\r\n", request_data.length());
+        snprintf(buffer, sizeof(buffer), "Content-Length: %llu\r\n", (unsigned long long)request_data.length());
         request.append(buffer);
     }
     if (user.length() > 0 || password.length() > 0) {
@@ -455,7 +455,9 @@ size_t HttpClient::get_content_offset(char* buffer, size_t buffer_size) {
     char* substr = strstr(buffer, "\r\n\r\n");
     if (substr != NULL) {
         substr += strlen("\r\n\r\n");
-        return (substr - buffer);
+        if (substr <= buffer + buffer_size) {
+            return (substr - buffer);
+        }
     }
     return -1;
 }
@@ -486,9 +488,10 @@ bool HttpClient::is_chunked_encoding(char* buffer, size_t buffer_size) {
  * @return the chunk length, -1 otherwise
  */
 size_t HttpClient::get_chunk_length(char* buffer, size_t buffer_size) {
-    long long length = -1;
-    if (sscanf(buffer, "%llx", &length) == 1) {
-        return length;
+    unsigned long long length = -1;
+    int num_chars = 0;
+    if (sscanf(buffer, "%llx%n", &length, &num_chars) == 1 && (size_t)num_chars <= buffer_size) {
+        return (size_t)length;
     }
     return -1;
 }
@@ -504,7 +507,9 @@ size_t HttpClient::get_chunk_offset(char* buffer, size_t buffer_size) {
     char* substr = strstr(buffer, "\r\n");
     if (substr != NULL) {
         substr += strlen("\r\n");
-        return (substr - buffer);
+        if (substr <= buffer + buffer_size) {
+            return (substr - buffer);
+        }
     }
     return -1;
 }
