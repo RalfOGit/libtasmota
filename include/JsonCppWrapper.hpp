@@ -33,7 +33,6 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <variant>
 #include <utility>
 
 #ifdef LIB_NAMESPACE
