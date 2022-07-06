@@ -28,16 +28,18 @@ namespace libralfogit {
         int communicate_with_server(const int socket_fd, const std::string& request, std::string& response, std::string& content);
         size_t recv_http_response(int socket_fd, char* buffer, int buffer_size);
         int    parse_http_response(char* buffer, size_t buffer_size, std::string& http_response, std::string& http_content);
-        static int    get_http_return_code(char* buffer, size_t buffer_size);
-        static size_t get_content_length(char* buffer, size_t buffer_size);
-        static size_t get_content_offset(char* buffer, size_t buffer_size);
-        static bool   is_chunked_encoding(char* buffer, size_t buffer_size);
-        static size_t get_chunk_length(char* buffer, size_t buffer_size);
-        static size_t get_chunk_offset(char* buffer, size_t buffer_size);
-        static size_t get_next_chunk_offset(char* buffer, size_t buffer_size);
+        static int    get_http_return_code(const char* buffer, size_t buffer_size);
+        static size_t get_content_length(const char* buffer, size_t buffer_size);
+        static size_t get_content_offset(const char* buffer, size_t buffer_size);
+        static bool   is_chunked_encoding(const char* buffer, size_t buffer_size);
+        static size_t get_chunk_length(const char* buffer, size_t buffer_size);
+        static size_t get_chunk_offset(const char* buffer, size_t buffer_size);
+        static size_t get_next_chunk_offset(const char* buffer, size_t buffer_size);
         static std::string base64_encode(const std::string& text);
         static const char* find(const char* hay, size_t hay_size, const char* needle);
         static const char* skipSpaceCharacters(const char* buffer, size_t buffer_size);
+        static unsigned long long scanUint(const char* buffer, size_t buffer_size, size_t* num_hars);
+        static unsigned long long scanHex(const char* buffer, size_t buffer_size, size_t* num_hars);
     };
 
 }   // namespace ralfogit

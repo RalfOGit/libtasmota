@@ -406,16 +406,15 @@ int HttpClient::parse_http_response(char* buffer, size_t buffer_size, std::strin
  * @param buffer_size size of the buffer; buffer_size must be one byte less than the underlying buffer size
  * @return the http return code if it is described in the http header, -1 otherwise
  */
-int HttpClient::get_http_return_code(char* buffer, size_t buffer_size) {
+int HttpClient::get_http_return_code(const char* buffer, size_t buffer_size) {
     const char* substr = find(buffer, buffer_size, "HTTP/1.1 ");    // a single SP character after HTTP/1.1 is mandatory
     if (substr != NULL) {
         substr += strlen("HTTP/1.1 ");
         substr = skipSpaceCharacters(substr, buffer_size - (substr - buffer));
         if (substr != NULL) {
-            int return_code = -1, num_chars = 0;
-            if ((size_t)(substr - buffer) < buffer_size &&
-                sscanf(substr, "%d%n", &return_code, &num_chars) == 1 &&
-                substr + num_chars <= buffer + buffer_size) {
+            size_t num_chars = 0;
+            int return_code = (int)scanUint(substr, buffer_size - (substr - buffer), &num_chars);
+            if (num_chars > 0) {
                 return return_code;
             }
         }
@@ -430,17 +429,15 @@ int HttpClient::get_http_return_code(char* buffer, size_t buffer_size) {
  * @param buffer_size size of the buffer; buffer_size must be one byte less than the underlying buffer size
  * @return the content length if it is described in the http header, -1 otherwise
  */
-size_t HttpClient::get_content_length(char* buffer, size_t buffer_size) {
+size_t HttpClient::get_content_length(const char* buffer, size_t buffer_size) {
     const char* substr = find(buffer, buffer_size, "\r\nContent-Length:");
     if (substr != NULL) {
         substr += strlen("\r\nContent-Length:");
         substr = skipSpaceCharacters(substr, buffer_size - (substr - buffer));
         if (substr != NULL) {
-            long long content_length = -1;
-            int num_chars = 0;
-            if (substr < buffer + buffer_size &&
-                sscanf(substr, "%lld%n", &content_length, &num_chars) == 1 &&
-                substr + num_chars <= buffer + buffer_size) {
+            size_t num_chars = 0;
+            size_t content_length = (size_t)scanUint(substr, buffer_size - (substr - buffer), &num_chars);
+            if (num_chars > 0) {
                 return content_length;
             }
         }
@@ -455,7 +452,7 @@ size_t HttpClient::get_content_length(char* buffer, size_t buffer_size) {
  * @param buffer_size size of the buffer
  * @return the offset of the first content data byte after the header
  */
-size_t HttpClient::get_content_offset(char* buffer, size_t buffer_size) {
+size_t HttpClient::get_content_offset(const char* buffer, size_t buffer_size) {
     const char* substr = find(buffer, buffer_size, "\r\n\r\n");
     if (substr != NULL) {
         substr += strlen("\r\n\r\n");
@@ -471,7 +468,7 @@ size_t HttpClient::get_content_offset(char* buffer, size_t buffer_size) {
  * @param buffer_size size of the buffer; buffer_size must be one byte less than the underlying buffer size
  * @return true, if chunked encoding is used; false otherwise
  */
-bool HttpClient::is_chunked_encoding(char* buffer, size_t buffer_size) {
+bool HttpClient::is_chunked_encoding(const char* buffer, size_t buffer_size) {
     const char* substr = find(buffer, buffer_size, "\r\nTransfer-Encoding: chunked");
     if (substr != NULL) {
         return true;
@@ -486,13 +483,13 @@ bool HttpClient::is_chunked_encoding(char* buffer, size_t buffer_size) {
  * @param buffer_size size of the buffer
  * @return the chunk length, -1 otherwise
  */
-size_t HttpClient::get_chunk_length(char* buffer, size_t buffer_size) {
+size_t HttpClient::get_chunk_length(const char* buffer, size_t buffer_size) {
     const char *substr = skipSpaceCharacters(buffer, buffer_size);
     if (substr != NULL) {
-        unsigned long long chunk_length = -1;
-        int num_chars = 0;
-        if (sscanf(substr, "%llx%n", &chunk_length, &num_chars) == 1 && (size_t)num_chars <= buffer_size) {
-            return (size_t)chunk_length;
+        size_t num_chars = 0;
+        size_t chunk_length = (size_t)scanHex(substr, buffer_size - (substr - buffer), &num_chars);
+        if (num_chars > 0) {
+            return chunk_length;
         }
     }
     return -1;
@@ -505,7 +502,7 @@ size_t HttpClient::get_chunk_length(char* buffer, size_t buffer_size) {
  * @param buffer_size size of the buffer
  * @return the offset of the first content data byte after the chunk header
  */
-size_t HttpClient::get_chunk_offset(char* buffer, size_t buffer_size) {
+size_t HttpClient::get_chunk_offset(const char* buffer, size_t buffer_size) {
     const char* substr = find(buffer, buffer_size, "\r\n");
     if (substr != NULL) {
         substr += strlen("\r\n");
@@ -523,7 +520,7 @@ size_t HttpClient::get_chunk_offset(char* buffer, size_t buffer_size) {
  * @param buffer_size size of the buffer
  * @return the offset to the next chunk header; 0 if this is the last chunk; -1 if there is not enough data
  */
-size_t HttpClient::get_next_chunk_offset(char* buffer, size_t buffer_size) {
+size_t HttpClient::get_next_chunk_offset(const char* buffer, size_t buffer_size) {
     size_t chunk_length = get_chunk_length(buffer, buffer_size);
     if (chunk_length == 0) {
         return 0;
@@ -535,7 +532,7 @@ size_t HttpClient::get_next_chunk_offset(char* buffer, size_t buffer_size) {
     if (chunk_offset == (size_t)-1) {
         return -1;
     }
-    char* ptr = buffer + chunk_offset + chunk_length;
+    const char* ptr = buffer + chunk_offset + chunk_length;
     if (ptr + 2 > buffer + buffer_size) {
         return -1;
     }
@@ -622,4 +619,57 @@ const char* HttpClient::skipSpaceCharacters(const char* buffer, size_t buffer_si
         ++ptr, --buffer_size;
     }
     return (buffer_size == 0 ? NULL : ptr);
+}
+
+
+/**
+ * Scan digits starting at the given pointer and at most up to the given buffer size and convert them to an unsigned integer
+ * @param buffer pointer to a buffer holding text data
+ * @param buffer_size size of the buffer
+ * @param num_chars pointer to an integer receiving the number of hex digits that have been scanned
+ * @return the unsigned value of the scanned digits
+ */
+unsigned long long HttpClient::scanUint(const char* buffer, size_t buffer_size, size_t* num_chars) {
+    const char* ptr = buffer;
+    unsigned long long int_value = 0;
+    while (buffer_size > 0 && *ptr >= '0' && *ptr <= '9') {
+        int digit = *ptr - '0';
+        int_value = int_value * 10 + digit;
+        ++ptr, --buffer_size;
+    }
+    if (num_chars != NULL) {
+        *num_chars = ptr - buffer;
+    }
+    return int_value;
+}
+
+
+/**
+ * Scan hex digits starting at the given pointer and at most up to the given buffer size and convert them to an unsigned integer
+ * @param buffer pointer to a buffer holding text data
+ * @param buffer_size size of the buffer
+ * @param num_chars pointer to an integer receiving the number of hex digits that have been scanned
+ * @return the unsigned value of the scanned hex digits
+ */
+unsigned long long HttpClient::scanHex(const char* buffer, size_t buffer_size, size_t* num_chars) {
+    const char* ptr = buffer;
+    unsigned long long int_value = 0;
+    while (buffer_size > 0 && ((*ptr >= '0' && *ptr <= '9') || (*ptr >= 'A' && *ptr <= 'F') || (*ptr >= 'a' && *ptr <= 'f'))) {
+        int digit = 0;
+        if (*ptr >= '0' && *ptr <= '9') {
+            digit = *ptr - '0';
+        }
+        else if (*ptr >= 'a' && *ptr <= 'f') {
+            digit = *ptr - 'a' + 10;
+        }
+        else if (*ptr >= 'A' && *ptr <= 'F') {
+            digit = *ptr - 'A' + 10;
+        }
+        int_value = int_value * 16 + digit;
+        ++ptr, --buffer_size;
+    }
+    if (num_chars != NULL) {
+        *num_chars = ptr - buffer;
+    }
+    return int_value;
 }
