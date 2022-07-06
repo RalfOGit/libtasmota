@@ -219,10 +219,9 @@ int HttpClient::communicate_with_server(const int socket_fd, const std::string& 
     char recv_buffer[4096];
     size_t nbytes_total = recv_http_response(socket_fd, recv_buffer, sizeof(recv_buffer));
     if (nbytes_total != (size_t)-1) {
-        std::string answer = std::string(recv_buffer, nbytes_total);
 
         // parse http response data
-        int http_return_code = parse_http_response(answer, response, content);
+        int http_return_code = parse_http_response(recv_buffer, nbytes_total, response, content);
         close_socket(socket_fd);
         return http_return_code;
     }
@@ -338,25 +337,25 @@ size_t HttpClient::recv_http_response(int socket_fd, char* recv_buffer, int recv
  * @param http_content output - a string holding the http response data
  * @return the http return code value or -1 in case of error
  */
-int HttpClient::parse_http_response(const std::string& answer, std::string& http_response, std::string& http_content) {
+int HttpClient::parse_http_response(char* buffer, size_t buffer_size, std::string& http_response, std::string& http_content) {
 
     // extract http return code
-    int http_return_code = get_http_return_code((char*)answer.c_str(), answer.length());
+    int http_return_code = get_http_return_code(buffer, buffer_size);
     if (http_return_code < 0) {
-        http_response = answer;
+        http_response = std::string(buffer, buffer_size);
         return -1;
     }
 
     // check if chunked encoding is used
-    bool chunked_encoding = is_chunked_encoding((char*)answer.c_str(), answer.length());
+    bool chunked_encoding = is_chunked_encoding(buffer, buffer_size);
     if (chunked_encoding == true) {
         std::string temp_content;
-        temp_content.reserve(answer.length());
+        temp_content.reserve(buffer_size);
 
         // determine content offset
-        size_t content_offset = get_content_offset((char*)answer.c_str(), answer.length());
+        size_t content_offset = get_content_offset(buffer, buffer_size);
         if (content_offset == (size_t)-1) {
-            http_response = answer;
+            http_response = std::string(buffer, buffer_size);
             return -1;
         }
 
@@ -364,37 +363,37 @@ int HttpClient::parse_http_response(const std::string& answer, std::string& http
         size_t ptr = content_offset;
         size_t next_chunk_offset = -2;
         while (next_chunk_offset != (size_t)-1 && next_chunk_offset != 0) {
-            next_chunk_offset = get_next_chunk_offset((char*)answer.data() + ptr, answer.length() - ptr);
+            next_chunk_offset = get_next_chunk_offset(buffer + ptr, buffer_size - ptr);
 
-            size_t chunk_length = get_chunk_length((char*)answer.data() + ptr, answer.length() - ptr);
-            size_t chunk_offset = get_chunk_offset((char*)answer.data() + ptr, answer.length() - ptr);
-            temp_content.append(answer, ptr + chunk_offset, chunk_length);
+            size_t chunk_length = get_chunk_length(buffer + ptr, buffer_size - ptr);
+            size_t chunk_offset = get_chunk_offset(buffer + ptr, buffer_size - ptr);
+            temp_content.append(buffer + ptr + chunk_offset, chunk_length);
 
             ptr += next_chunk_offset;
         }
 
         // prepare response and content strings
-        http_response = answer.substr(0, content_offset);
+        http_response = std::string(buffer, content_offset);
         http_content = temp_content;
     }
     else {
         // extract content length
-        size_t content_length = get_content_length((char*)answer.c_str(), answer.length());
+        size_t content_length = get_content_length(buffer, buffer_size);
         if (content_length == (size_t)-1) {
-            http_response = answer;
+            http_response = std::string(buffer, buffer_size);
             return http_return_code;
         }
 
         // determine content offset
-        size_t content_offset = get_content_offset((char*)answer.c_str(), answer.length());
+        size_t content_offset = get_content_offset(buffer, buffer_size);
         if (content_offset == (size_t)-1) {
-            http_response = answer;
+            http_response = std::string(buffer, buffer_size);
             return http_return_code;
         }
 
         // prepare response and content strings
-        http_response = answer.substr(0, content_offset);
-        http_content = answer.substr(content_offset);
+        http_response = std::string(buffer, content_offset);
+        http_content = std::string(buffer + content_offset, buffer_size - content_offset);
     }
 
     return http_return_code;
@@ -408,14 +407,17 @@ int HttpClient::parse_http_response(const std::string& answer, std::string& http
  * @return the http return code if it is described in the http header, -1 otherwise
  */
 int HttpClient::get_http_return_code(char* buffer, size_t buffer_size) {
-    const char* substr = find(buffer, buffer_size, "HTTP/1.1 ");
+    const char* substr = find(buffer, buffer_size, "HTTP/1.1 ");    // a single SP character after HTTP/1.1 is mandatory
     if (substr != NULL) {
         substr += strlen("HTTP/1.1 ");
-        int return_code = -1, num_chars = 0;
-        if ((size_t)(substr - buffer) < buffer_size && 
-            sscanf(substr, " %d%n", &return_code, &num_chars) == 1 &&
-            substr + num_chars <= buffer + buffer_size) {
-            return return_code;
+        substr = skipSpaceCharacters(substr, buffer_size - (substr - buffer));
+        if (substr != NULL) {
+            int return_code = -1, num_chars = 0;
+            if ((size_t)(substr - buffer) < buffer_size &&
+                sscanf(substr, "%d%n", &return_code, &num_chars) == 1 &&
+                substr + num_chars <= buffer + buffer_size) {
+                return return_code;
+            }
         }
     }
     return -1;
@@ -429,15 +431,18 @@ int HttpClient::get_http_return_code(char* buffer, size_t buffer_size) {
  * @return the content length if it is described in the http header, -1 otherwise
  */
 size_t HttpClient::get_content_length(char* buffer, size_t buffer_size) {
-    const char* substr = find(buffer, buffer_size, "\r\nContent-Length: ");
+    const char* substr = find(buffer, buffer_size, "\r\nContent-Length:");
     if (substr != NULL) {
-        substr += strlen("\r\nContent-Length: ");
-        long long content_length = -1;
-        int num_chars = 0;
-        if (substr < buffer + buffer_size && 
-            sscanf(substr, " %lld%n", &content_length, &num_chars) == 1 &&
-            substr + num_chars <= buffer + buffer_size) {
-            return content_length;
+        substr += strlen("\r\nContent-Length:");
+        substr = skipSpaceCharacters(substr, buffer_size - (substr - buffer));
+        if (substr != NULL) {
+            long long content_length = -1;
+            int num_chars = 0;
+            if (substr < buffer + buffer_size &&
+                sscanf(substr, "%lld%n", &content_length, &num_chars) == 1 &&
+                substr + num_chars <= buffer + buffer_size) {
+                return content_length;
+            }
         }
     }
     return -1;
@@ -454,9 +459,7 @@ size_t HttpClient::get_content_offset(char* buffer, size_t buffer_size) {
     const char* substr = find(buffer, buffer_size, "\r\n\r\n");
     if (substr != NULL) {
         substr += strlen("\r\n\r\n");
-        if (substr <= buffer + buffer_size) {
-            return (substr - buffer);
-        }
+        return (substr - buffer);
     }
     return -1;
 }
@@ -470,7 +473,7 @@ size_t HttpClient::get_content_offset(char* buffer, size_t buffer_size) {
  */
 bool HttpClient::is_chunked_encoding(char* buffer, size_t buffer_size) {
     const char* substr = find(buffer, buffer_size, "\r\nTransfer-Encoding: chunked");
-    if (substr + strlen("\r\nTransfer-Encoding: chunked") <= buffer + buffer_size) {
+    if (substr != NULL) {
         return true;
     }
     return false;
@@ -484,10 +487,13 @@ bool HttpClient::is_chunked_encoding(char* buffer, size_t buffer_size) {
  * @return the chunk length, -1 otherwise
  */
 size_t HttpClient::get_chunk_length(char* buffer, size_t buffer_size) {
-    unsigned long long chunk_length = -1;
-    int num_chars = 0;
-    if (sscanf(buffer, "%llx%n", &chunk_length, &num_chars) == 1 && (size_t)num_chars <= buffer_size) {
-        return (size_t)chunk_length;
+    const char *substr = skipSpaceCharacters(buffer, buffer_size);
+    if (substr != NULL) {
+        unsigned long long chunk_length = -1;
+        int num_chars = 0;
+        if (sscanf(substr, "%llx%n", &chunk_length, &num_chars) == 1 && (size_t)num_chars <= buffer_size) {
+            return (size_t)chunk_length;
+        }
     }
     return -1;
 }
@@ -584,7 +590,7 @@ const char* HttpClient::find(const char* hay, size_t hay_size, const char* needl
     char c = *needle;
 
     if (c == '\0') {
-        return (char*)hay;
+        return hay;
     }
 
     // simplistic string search algorithm with O(n2) worst case
@@ -592,7 +598,7 @@ const char* HttpClient::find(const char* hay, size_t hay_size, const char* needl
         if (*hay == c) {
             for (i = 1;; i++) {
                 if (i == len) {
-                    return (char*)hay;
+                    return hay;
                 }
                 if (hay[i] != needle[i]) {
                     break;
@@ -601,4 +607,19 @@ const char* HttpClient::find(const char* hay, size_t hay_size, const char* needl
         }
     }
     return NULL;
+}
+
+
+/**
+ * Skip space characters starting at the given pointer and at most up to the given buffer size.
+ * @param buffer pointer to a buffer holding text data
+ * @param buffer_size size of the buffer
+ * @return the ptr to the first non-space character, or null if the end of the buffer has been reached
+ */
+const char* HttpClient::skipSpaceCharacters(const char* buffer, size_t buffer_size) {
+    const char* ptr = buffer;
+    while (buffer_size > 0 && *ptr == ' ') {
+        ++ptr, --buffer_size;
+    }
+    return (buffer_size == 0 ? NULL : ptr);
 }

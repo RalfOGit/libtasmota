@@ -27,7 +27,7 @@ namespace libralfogit {
         int connect_to_server(const std::string& host, const int port);
         int communicate_with_server(const int socket_fd, const std::string& request, std::string& response, std::string& content);
         size_t recv_http_response(int socket_fd, char* buffer, int buffer_size);
-        int    parse_http_response(const std::string& answer, std::string& http_response, std::string& http_content);
+        int    parse_http_response(char* buffer, size_t buffer_size, std::string& http_response, std::string& http_content);
         static int    get_http_return_code(char* buffer, size_t buffer_size);
         static size_t get_content_length(char* buffer, size_t buffer_size);
         static size_t get_content_offset(char* buffer, size_t buffer_size);
@@ -37,6 +37,7 @@ namespace libralfogit {
         static size_t get_next_chunk_offset(char* buffer, size_t buffer_size);
         static std::string base64_encode(const std::string& text);
         static const char* find(const char* hay, size_t hay_size, const char* needle);
+        static const char* skipSpaceCharacters(const char* buffer, size_t buffer_size);
     };
 
 }   // namespace ralfogit
