@@ -312,6 +312,11 @@ size_t HttpClient::recv_http_response(int socket_fd) {
                     content_offset = content_offs;
                     chunked_encode = is_chunked_encoding(recv_buffer, content_offset);
                     content_length = get_content_length(recv_buffer, content_offset);
+                    // if there is no content length information and the return code is 204 "no content", finish receive loop
+                    if (chunked_encode == false && content_length == (size_t)-1 &&
+                        get_http_return_code(recv_buffer, content_offs) == 204) {
+                        break;
+                    }
                 }
             }
             // if the entire http response header has been received
