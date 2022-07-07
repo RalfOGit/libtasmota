@@ -71,6 +71,24 @@ HttpClient::HttpClient(void) {
         perror("WSAStartup failure");
     }
 #endif
+    recv_buffer_size = 4096;
+    recv_buffer = (char*)malloc(recv_buffer_size);
+    if (recv_buffer == NULL) {
+        recv_buffer_size = 0;
+        perror("cannot allocate recv_buffer for HttpClient");
+    }
+}
+
+
+/**
+ *  Destructor.
+ */
+HttpClient::~HttpClient(void) {
+    if (recv_buffer != NULL) {
+        free(recv_buffer);
+        recv_buffer = NULL;
+        recv_buffer_size = 0;
+    }
 }
 
 
@@ -216,8 +234,7 @@ int HttpClient::communicate_with_server(const int socket_fd, const std::string& 
     }
 
     // receive http get response data
-    char recv_buffer[4096];
-    size_t nbytes_total = recv_http_response(socket_fd, recv_buffer, sizeof(recv_buffer));
+    size_t nbytes_total = recv_http_response(socket_fd);
     if (nbytes_total != (size_t)-1) {
 
         // parse http response data
@@ -237,7 +254,7 @@ int HttpClient::communicate_with_server(const int socket_fd, const std::string& 
  * @param recv_buffer_size the size of the recv_buffer
  * @return number of bytes received
  */
-size_t HttpClient::recv_http_response(int socket_fd, char* recv_buffer, int recv_buffer_size) {
+size_t HttpClient::recv_http_response(int socket_fd) {
     struct pollfd fds;
     size_t nbytes_total = 0;
     recv_buffer[nbytes_total] = '\0';
@@ -269,6 +286,15 @@ size_t HttpClient::recv_http_response(int socket_fd, char* recv_buffer, int recv
 
         // check poll result
         if (pollin == true) {
+            // ensure receive buffer size
+            if (recv_buffer_size - nbytes_total - 1 < 1024) {
+                char *realloc_buffer = (char*)realloc(recv_buffer, 2 * recv_buffer_size);
+                if (realloc_buffer != NULL) {
+                    recv_buffer = realloc_buffer;
+                    recv_buffer_size *= 2;
+                }
+            }
+
             // receive data
             int nbytes = recv(socket_fd, recv_buffer + nbytes_total, (int)(recv_buffer_size - nbytes_total - 1), 0);
             if (nbytes < 0) {
@@ -313,17 +339,20 @@ size_t HttpClient::recv_http_response(int socket_fd, char* recv_buffer, int recv
             }
             //printf("recv: nbytes %d  nbytes_total %d  content_length %d  content_offset %d\n", nbytes, (int)nbytes_total, (int)content_length, (int)content_offset);
         }
-        if (pollnval == true) {
-            perror("pollnval");
-            return (nbytes_total > 0 ? nbytes_total : -1);
-        }
-        if (pollerr == true) {
-            perror("pollerr");
-            return (nbytes_total > 0 ? nbytes_total : -1);
-        }
-        if (pollhup == true) {  // this is a perfectly valid way to determine a transfer
-            perror("pollhup");
-            return (nbytes_total > 0 ? nbytes_total : -1);
+        else {
+            // test for error and hangup conditions only if there is no input data waiting
+            if (pollnval == true) {
+                perror("pollnval");
+                return (nbytes_total > 0 ? nbytes_total : -1);
+            }
+            if (pollerr == true) {
+                perror("pollerr");
+                return (nbytes_total > 0 ? nbytes_total : -1);
+            }
+            if (pollhup == true) {  // this is a perfectly valid way to determine a transfer
+                perror("pollhup");
+                return (nbytes_total > 0 ? nbytes_total : -1);
+            }
         }
     }
     return nbytes_total;
@@ -337,7 +366,7 @@ size_t HttpClient::recv_http_response(int socket_fd, char* recv_buffer, int recv
  * @param http_content output - a string holding the http response data
  * @return the http return code value or -1 in case of error
  */
-int HttpClient::parse_http_response(char* buffer, size_t buffer_size, std::string& http_response, std::string& http_content) {
+int HttpClient::parse_http_response(const char* buffer, size_t buffer_size, std::string& http_response, std::string& http_content) {
 
     // extract http return code
     int http_return_code = get_http_return_code(buffer, buffer_size);
@@ -484,12 +513,14 @@ bool HttpClient::is_chunked_encoding(const char* buffer, size_t buffer_size) {
  * @return the chunk length, -1 otherwise
  */
 size_t HttpClient::get_chunk_length(const char* buffer, size_t buffer_size) {
-    const char *substr = skipSpaceCharacters(buffer, buffer_size);
-    if (substr != NULL) {
-        size_t num_chars = 0;
-        size_t chunk_length = (size_t)scanHex(substr, buffer_size - (substr - buffer), &num_chars);
-        if (num_chars > 0) {
-            return chunk_length;
+    if (get_chunk_offset(buffer, buffer_size) != (size_t)-1) {  // ensure that the chunk header is completely available
+        const char* substr = skipSpaceCharacters(buffer, buffer_size);
+        if (substr != NULL) {
+            size_t num_chars = 0;
+            size_t chunk_length = (size_t)scanHex(substr, buffer_size - (substr - buffer), &num_chars);
+            if (num_chars > 0) {
+                return chunk_length;
+            }
         }
     }
     return -1;
@@ -629,9 +660,9 @@ const char* HttpClient::skipSpaceCharacters(const char* buffer, size_t buffer_si
  * @param num_chars pointer to an integer receiving the number of hex digits that have been scanned
  * @return the unsigned value of the scanned digits
  */
-unsigned long long HttpClient::scanUint(const char* buffer, size_t buffer_size, size_t* num_chars) {
+size_t HttpClient::scanUint(const char* buffer, size_t buffer_size, size_t* num_chars) {
     const char* ptr = buffer;
-    unsigned long long int_value = 0;
+    size_t int_value = 0;
     while (buffer_size > 0 && *ptr >= '0' && *ptr <= '9') {
         int digit = *ptr - '0';
         int_value = int_value * 10 + digit;
@@ -651,9 +682,9 @@ unsigned long long HttpClient::scanUint(const char* buffer, size_t buffer_size, 
  * @param num_chars pointer to an integer receiving the number of hex digits that have been scanned
  * @return the unsigned value of the scanned hex digits
  */
-unsigned long long HttpClient::scanHex(const char* buffer, size_t buffer_size, size_t* num_chars) {
+size_t HttpClient::scanHex(const char* buffer, size_t buffer_size, size_t* num_chars) {
     const char* ptr = buffer;
-    unsigned long long int_value = 0;
+    size_t int_value = 0;
     while (buffer_size > 0 && ((*ptr >= '0' && *ptr <= '9') || (*ptr >= 'A' && *ptr <= 'F') || (*ptr >= 'a' && *ptr <= 'f'))) {
         int digit = 0;
         if (*ptr >= '0' && *ptr <= '9') {
