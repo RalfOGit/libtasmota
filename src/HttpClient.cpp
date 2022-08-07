@@ -398,11 +398,12 @@ int HttpClient::parse_http_response(const char* buffer, size_t buffer_size, std:
         size_t next_chunk_offset = -2;
         while (next_chunk_offset != (size_t)-1 && next_chunk_offset != 0) {
             next_chunk_offset = get_next_chunk_offset(buffer + ptr, buffer_size - ptr);
-
-            size_t chunk_length = get_chunk_length(buffer + ptr, buffer_size - ptr);
-            size_t chunk_offset = get_chunk_offset(buffer + ptr, buffer_size - ptr);
-            temp_content.append(buffer + ptr + chunk_offset, chunk_length);
-
+            // check if this chunk is complete
+            if (next_chunk_offset != (size_t)-1) {  
+                size_t chunk_length = get_chunk_length(buffer + ptr, buffer_size - ptr);
+                size_t chunk_offset = get_chunk_offset(buffer + ptr, buffer_size - ptr);
+                temp_content.append(buffer + ptr + chunk_offset, chunk_length);
+            }
             ptr += next_chunk_offset;
         }
 
