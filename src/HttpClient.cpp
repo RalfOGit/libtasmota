@@ -403,13 +403,16 @@ int HttpClient::parse_http_response(const char* buffer, size_t buffer_size, std:
                 size_t chunk_length = get_chunk_length(buffer + ptr, buffer_size - ptr);
                 size_t chunk_offset = get_chunk_offset(buffer + ptr, buffer_size - ptr);
                 temp_content.append(buffer + ptr + chunk_offset, chunk_length);
+                ptr += next_chunk_offset;
             }
-            ptr += next_chunk_offset;
         }
 
         // prepare response and content strings
         http_response = std::string(buffer, content_offset);
         http_content = temp_content;
+        if (next_chunk_offset == (size_t)-1) {
+            return -1;
+        }
     }
     else {
         // extract content length
@@ -429,6 +432,9 @@ int HttpClient::parse_http_response(const char* buffer, size_t buffer_size, std:
         // prepare response and content strings
         http_response = std::string(buffer, content_offset);
         http_content = std::string(buffer + content_offset, buffer_size - content_offset);
+        if (http_content.length() != content_length) {
+            return -1;
+        }
     }
 
     return http_return_code;
