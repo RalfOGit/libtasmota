@@ -399,7 +399,7 @@ int HttpClient::parse_http_response(const char* buffer, size_t buffer_size, std:
         while (next_chunk_offset != (size_t)-1 && next_chunk_offset != 0) {
             next_chunk_offset = get_next_chunk_offset(buffer + ptr, buffer_size - ptr);
             // check if this chunk is complete
-            if (next_chunk_offset != (size_t)-1) {  
+            if (next_chunk_offset != (size_t)-1) {
                 size_t chunk_length = get_chunk_length(buffer + ptr, buffer_size - ptr);
                 size_t chunk_offset = get_chunk_offset(buffer + ptr, buffer_size - ptr);
                 temp_content.append(buffer + ptr + chunk_offset, chunk_length);
@@ -449,6 +449,9 @@ int HttpClient::parse_http_response(const char* buffer, size_t buffer_size, std:
  */
 int HttpClient::get_http_return_code(const char* buffer, size_t buffer_size) {
     const char* substr = find(buffer, buffer_size, "HTTP/1.1 ");    // a single SP character after HTTP/1.1 is mandatory
+    if (substr == NULL) {
+        substr = find(buffer, buffer_size, "HTTP/1.0 ");            // a single SP character after HTTP/1.0 is mandatory
+    }
     if (substr != NULL) {
         substr += strlen("HTTP/1.1 ");
         substr = skipSpaceCharacters(substr, buffer_size - (substr - buffer));
@@ -588,19 +591,19 @@ size_t HttpClient::get_next_chunk_offset(const char* buffer, size_t buffer_size)
 
 /**
  * Base64 encoding, loosely modelled after Simon Josefssons' reference implementation for rfc3548.
- * @param input string 
+ * @param input string
  * @return the base64 encoded input string
  */
 std::string HttpClient::base64_encode(const std::string& input) {
     static const unsigned char b64_data[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     std::string output((input.length() + 2) * 2 + 1, '\0');  // initialize twice the necessary size with '\0' characters
-    const unsigned char *in = (const unsigned char*)input.data();
+    const unsigned char* in = (const unsigned char*)input.data();
     unsigned char* out = (unsigned char*)output.data();
     std::string::size_type length = input.length();
 
     while (length > 0) {
-        *out++ = b64_data[( in[0] >> 2) & 0x3f];
+        *out++ = b64_data[(in[0] >> 2) & 0x3f];
         *out++ = b64_data[((in[0] << 4) + (--length > 0 ? in[1] >> 4 : 0)) & 0x3f];
         *out++ = (length > 0 ? b64_data[((in[1] << 2) + (--length > 0 ? in[2] >> 6 : 0)) & 0x3f] : '=');
         *out++ = (length > 0 ? b64_data[in[2] & 0x3f] : '=');
