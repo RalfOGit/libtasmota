@@ -230,7 +230,16 @@ int Url::parseUrl(const std::string& url, std::string& protocol, std::string& us
             offs = i;
         }
         else {
-            return -1;
+            bool has_protocol = (offs > 0);
+            bool has_query    = (url.find("?", offs) != std::string::npos);
+            bool has_fragment = (url.find("#", offs) != std::string::npos);
+            if (has_protocol && !has_query && !has_fragment) {
+                host = url.substr(offs);
+                offs = url.length();
+            }
+            else {
+                return -1;
+            }
         }
     }
     else {
