@@ -32,7 +32,7 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <JsonCppWrapper.hpp>
+#include <JsonCpp.hpp>
 
 #ifdef LIB_NAMESPACE
 namespace LIB_NAMESPACE {
